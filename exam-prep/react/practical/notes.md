@@ -1,72 +1,87 @@
 # React Practical Notes
 
 ## 1. Localstorage for Authentication
+
 ### Example:
+
 ```jsx
 // Save token after login
-localStorage.setItem('token', userToken);
+localStorage.setItem("token", userToken);
 // Retrieve token for protection
-const token = localStorage.getItem('token');
+const token = localStorage.getItem("token");
 ```
 
 ## 2. Login/Register/Logout
+
 ### Example:
+
 ```jsx
 // Login.jsx
 function handleLogin() {
   // Validate user, get token
-  localStorage.setItem('token', token);
+  localStorage.setItem("token", token);
 }
 
 function handleLogout() {
-  localStorage.removeItem('token');
+  localStorage.removeItem("token");
 }
 ```
 
 ## 3. Add a Route and Protect It
+
 ### Example:
+
 ```jsx
 // App.jsx
-<Route path="/dashboard" element={<Dashboard />} />
+<Route path="/dashboard" element={<Dashboard />} />;
 
 // Protect route with useEffect
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 useEffect(() => {
-  if (!localStorage.getItem('token')) navigate('/login');
+  if (!localStorage.getItem("token")) navigate("/login");
 }, []);
 ```
 
 ## 4. Conditional Rendering
+
 ### Example:
+
 ```jsx
-{token ? <Dashboard /> : <Login />}
+{
+  token ? <Dashboard /> : <Login />;
+}
 ```
 
 ## 5. Sample Exam Tasks
+
 - Implement login/logout with localstorage
 - Add and protect a route
 - Use conditional rendering for authentication
 
 ## 6. Common Pitfalls
+
 - Infinite loops in useEffect
 - Not cleaning up subscriptions
 - Incorrect dependency arrays
 
 ## 7. Debugging Tips
+
 - Use React DevTools
 - Check console for warnings/errors
 - Use console.log in components
 
 ## 8. Sample Exam Tasks
+
 - Implement login/logout with localstorage
 - Add and protect a route with useEffect
 - Create a component with form and state
 - Use conditional rendering for auth
 
 ## 9. Full Example: Login System
+
 ```jsx
 // AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
@@ -74,21 +89,21 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       // Validate token and set user
-      setUser({ name: 'John Doe' });
+      setUser({ name: "John Doe" });
     }
   }, []);
 
   const login = (credentials) => {
     // API call to login
-    localStorage.setItem('token', 'fake-token');
-    setUser({ name: 'John Doe' });
+    localStorage.setItem("token", "fake-token");
+    setUser({ name: "John Doe" });
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setUser(null);
   };
 
@@ -104,8 +119,8 @@ export function useAuth() {
 }
 
 // App.jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './AuthContext';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./AuthContext";
 
 function App() {
   return (
@@ -113,7 +128,14 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
@@ -121,8 +143,8 @@ function App() {
 }
 
 // ProtectedRoute.jsx
-import { useAuth } from './AuthContext';
-import { Navigate } from 'react-router-dom';
+import { useAuth } from "./AuthContext";
+import { Navigate } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -131,20 +153,25 @@ function ProtectedRoute({ children }) {
 ```
 
 ## 10. Troubleshooting Guide
+
 ### Common Issues:
+
 - **Component not re-rendering:** Check state updates and key props
 - **useEffect running infinitely:** Fix dependency array
 - **Context not updating:** Ensure proper provider setup
 - **Routing not working:** Check route configuration
 
 ### Debugging Steps:
+
 1. Use React DevTools to inspect component tree
 2. Check console for warnings/errors
 3. Verify hook dependencies
 4. Test components in isolation
 
 ## 11. Integration Examples
+
 ### Complete Todo App with Auth
+
 ```jsx
 // AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -294,3 +321,4 @@ function Login() {
     e.preventDefault();
     const result = await login(credentials);
     if
+```

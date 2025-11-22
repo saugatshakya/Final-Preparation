@@ -1,16 +1,20 @@
 # Angular Practical Notes
 
 ## 1. Localstorage for Authentication
+
 ### Example:
+
 ```typescript
 // Save token after login
-localStorage.setItem('token', userToken);
+localStorage.setItem("token", userToken);
 // Retrieve token for guard
-const token = localStorage.getItem('token');
+const token = localStorage.getItem("token");
 ```
 
 ## 2. Login/Register/Logout
+
 ### Example:
+
 ```typescript
 // login.component.ts
 login() {
@@ -24,7 +28,9 @@ logout() {
 ```
 
 ## 3. Add a Route and Protect It
+
 ### Example:
+
 ```typescript
 // app.routes.ts
 { path: 'chat', component: ChatComponent, canActivate: [AuthGuard] }
@@ -36,16 +42,20 @@ canActivate(): boolean {
 ```
 
 ## 4. Component Creation
+
 ### CLI Command:
+
 ```bash
 ng g c Chat
 ```
 
 ## 5. Unit Testing
+
 ### Example:
+
 ```typescript
-describe('LoginComponent', () => {
-  it('should create', () => {
+describe("LoginComponent", () => {
+  it("should create", () => {
     const fixture = TestBed.createComponent(LoginComponent);
     const comp = fixture.componentInstance;
     expect(comp).toBeTruthy();
@@ -54,23 +64,27 @@ describe('LoginComponent', () => {
 ```
 
 ## 6. Common Pitfalls
+
 - Forgetting to import modules
 - Not subscribing to observables
 - Incorrect guard implementation
 
 ## 7. Debugging Tips
+
 - Use Angular DevTools
 - Check console for errors
 - Use breakpoints in browser dev tools
 
 ## 8. Sample Exam Tasks
+
 - Implement login/logout with localstorage
 - Add and protect a route with guard
 - Create a new component with form
 - Write a unit test for a service
 
 ## 9. Full Example: Login System
-```typescript
+
+````typescript
 // auth.service.ts
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -282,3 +296,4 @@ export class LoginComponent {
 - Implement proper error handling
 - Use OnPush change detection for performance
 - Follow Angular style guide
+````

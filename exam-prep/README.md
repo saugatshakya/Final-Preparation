@@ -3,6 +3,7 @@
 This directory is organized to help you prepare for your final exam. Each major topic is split into theory and practical/code sections for focused study.
 
 ## Structure
+
 - testing/
 - web_service/
 - spa/
@@ -14,16 +15,19 @@ This directory is organized to help you prepare for your final exam. Each major 
 - llm_function_calling/
 
 Each topic contains:
+
 - theory/: Detailed notes, concepts, code examples, sample Q&A
 - practical/: Step-by-step instructions, code snippets, full examples, exam tasks
 
 ## How to Use
+
 - Start with theory to understand concepts (refer to slides in each topic)
 - Practice with code samples and exercises in practical/
 - Review past questions and professor's hints in practical/
 - Use the sample Q&A for quick revision
 
 ## Topics Covered
+
 - Testing: Unit, Integration, E2E testing with examples
 - RESTful Web Service: API design, middleware, models, CRUD operations
 - SPA: Single Page Applications, routing, state management, conditional rendering
@@ -35,12 +39,14 @@ Each topic contains:
 - LLM Function Calling: Integrating LLMs with function calling capabilities
 
 ## Practical Exam Hints
-- Angular: Localstorage, Login/Register/Logout, *ngIf, Component creation, Routing, Guards, Unit Testing
+
+- Angular: Localstorage, Login/Register/Logout, \*ngIf, Component creation, Routing, Guards, Unit Testing
 - Backend: API endpoints, middleware, models, protecting endpoints, adding new models/schemas
 - React: Localstorage, Login/Register/Logout, useState, useEffect, routing, protection, redirects
-- Frontend: Conditional rendering (*ngIf, ternary, &&)
+- Frontend: Conditional rendering (\*ngIf, ternary, &&)
 
 ## Key Features
+
 - Detailed code examples for each concept
 - Sample exam questions and answers
 - Common pitfalls and debugging tips
@@ -48,12 +54,14 @@ Each topic contains:
 - Step-by-step implementation guides
 
 ## Study Plan
+
 1. **Week 1:** Focus on theory notes for all topics (understand concepts)
 2. **Week 2:** Practice with practical examples and code snippets
 3. **Week 3:** Review sample Q&A and debugging tips
 4. **Week 4:** Full mock exams using the practical tasks
 
 ## Exam Tips
+
 - Focus on the professor's hints for practical questions
 - Practice implementing the code patterns shown
 - Understand the flow: frontend → API → backend → database
@@ -61,12 +69,14 @@ Each topic contains:
 - Master authentication patterns in both Angular and React
 
 ## Quick Reference
+
 - **Angular:** `ng g c ComponentName`, routes in `app.routes.ts`, guards with `canActivate`
 - **React:** Hooks (`useState`, `useEffect`), routing with `react-router`
 - **Express:** Routes in `routes/`, middleware in `middleware/`, models in `models/`
 - **Testing:** Unit tests with Jasmine/Karma (Angular), Jest (React)
 
 ## Additional Resources
+
 - Review your mockexam code for practical examples
 - Check slides for diagrams and additional context
 - Practice with Postman for API testing
@@ -75,39 +85,41 @@ Each topic contains:
 ## Cheat Sheet
 
 ### Express.js
+
 ```js
 // Basic server
-const express = require('express');
+const express = require("express");
 const app = express();
 app.use(express.json());
 
 // Route
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   res.json(users);
 });
 
 // Middleware
 function auth(req, res, next) {
-  const token = req.header('Authorization');
-  if (!token) return res.status(401).send('Access denied');
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).send("Access denied");
   next();
 }
 
 // Protected route
-app.get('/api/protected', auth, (req, res) => {
-  res.send('Protected data');
+app.get("/api/protected", auth, (req, res) => {
+  res.send("Protected data");
 });
 
 // Model
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema({
   name: String,
-  email: String
+  email: String,
 });
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 ```
 
 ### Angular
+
 ```typescript
 // Component
 @Component({
@@ -122,7 +134,7 @@ export class UserComponent {
 @Injectable({ providedIn: 'root' })
 export class UserService {
   constructor(private http: HttpClient) {}
-  
+
   getUsers() {
     return this.http.get('/api/users');
   }
@@ -141,18 +153,21 @@ export class AuthGuard implements CanActivate {
 ```
 
 ### React
+
 ```jsx
 // Component
 function UserList() {
   const [users, setUsers] = useState([]);
-  
+
   useEffect(() => {
     fetchUsers();
   }, []);
-  
+
   return (
     <ul>
-      {users.map(user => <li key={user.id}>{user.name}</li>)}
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
     </ul>
   );
 }
@@ -163,12 +178,12 @@ function useLocalStorage(key, initialValue) {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : initialValue;
   });
-  
+
   const setStoredValue = (newValue) => {
     setValue(newValue);
     localStorage.setItem(key, JSON.stringify(newValue));
   };
-  
+
   return [value, setStoredValue];
 }
 
@@ -185,17 +200,18 @@ function AuthProvider({ children }) {
 ```
 
 ### Testing
+
 ```typescript
 // Angular Unit Test
-describe('UserService', () => {
+describe("UserService", () => {
   let service: UserService;
-  
+
   beforeEach(() => {
     TestBed.configureTestingModule({});
     service = TestBed.inject(UserService);
   });
-  
-  it('should be created', () => {
+
+  it("should be created", () => {
     expect(service).toBeTruthy();
   });
 });
@@ -203,16 +219,17 @@ describe('UserService', () => {
 
 ```jsx
 // React Unit Test
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen } from "@testing-library/react";
+import App from "./App";
 
-test('renders app', () => {
+test("renders app", () => {
   render(<App />);
-  expect(screen.getByText('App')).toBeInTheDocument();
+  expect(screen.getByText("App")).toBeInTheDocument();
 });
 ```
 
 ### DevOps
+
 ```yaml
 # .gitlab-ci.yml
 stages:
@@ -237,7 +254,7 @@ deploy:
 
 ```yaml
 # docker-compose.yml
-version: '3'
+version: "3"
 services:
   web:
     build: .

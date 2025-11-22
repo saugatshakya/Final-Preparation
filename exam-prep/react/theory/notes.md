@@ -1,78 +1,92 @@
 # React Theory Notes
 
 ## 1. Introduction
+
 React is a JavaScript library for building user interfaces, especially SPA (Single Page Applications).
 
 ## 2. Components
+
 Components are reusable pieces of UI. They can be functional or class-based.
 
 ### Example (Functional):
+
 ```jsx
 function Greeting(props) {
-	return <h1>Hello, {props.name}!</h1>;
+  return <h1>Hello, {props.name}!</h1>;
 }
 ```
 
 ## 3. Hooks
+
 Hooks let you use state and other React features in functional components.
 
 ### useState
+
 ```jsx
 const [count, setCount] = useState(0);
 ```
 
 ### useEffect
+
 ```jsx
 useEffect(() => {
-	// Runs after render
+  // Runs after render
 }, []);
 ```
 
 ## 4. Routing
+
 React Router enables navigation between views/components.
 
 ### Example:
+
 ```jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 function App() {
-	return (
-		<BrowserRouter>
-			<Routes>
-				<Route path="/login" element={<Login />} />
-				<Route path="/dashboard" element={<Dashboard />} />
-			</Routes>
-		</BrowserRouter>
-	);
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 ```
 
 ## 5. Authentication & Localstorage
+
 Store tokens in localstorage for authentication.
 
 ### Example:
+
 ```jsx
 // Save token
-localStorage.setItem('token', userToken);
+localStorage.setItem("token", userToken);
 // Retrieve token
-const token = localStorage.getItem('token');
+const token = localStorage.getItem("token");
 ```
 
 ## 6. Protecting Routes
+
 Use useEffect to redirect unauthenticated users.
 
 ### Example:
+
 ```jsx
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 useEffect(() => {
-	if (!localStorage.getItem('token')) navigate('/login');
+  if (!localStorage.getItem("token")) navigate("/login");
 }, []);
 ```
 
 ## 7. Context API
+
 For global state management, use Context API.
 
 ### Example:
+
 ```jsx
 const UserContext = createContext();
 
@@ -87,14 +101,16 @@ function App() {
 
 function Component() {
   const { user } = useContext(UserContext);
-  return <div>{user ? user.name : 'Not logged in'}</div>;
+  return <div>{user ? user.name : "Not logged in"}</div>;
 }
 ```
 
 ## 8. Custom Hooks
+
 Create reusable logic with custom hooks.
 
 ### Example:
+
 ```jsx
 function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -118,6 +134,7 @@ function useLocalStorage(key, initialValue) {
 ```
 
 ## 9. Useful Exam Patterns
+
 - Create component: function or class
 - Use hooks for state/effects
 - Add routes in App.jsx
@@ -125,6 +142,7 @@ function useLocalStorage(key, initialValue) {
 - Use localstorage for authentication
 
 ## 10. Sample Exam Q&A
+
 **Q: How do you create a new component in React?**
 A: Define a function or class that returns JSX.
 
@@ -141,18 +159,21 @@ A: useState manages state, useEffect handles side effects.
 A: Use Context API or state management libraries like Redux.
 
 ## 10. Debugging Tips
+
 - Use React DevTools browser extension
 - Check component re-rendering causes
 - Review hook dependency arrays
 - Use console.log in useEffect for debugging
 
 ## 11. Sample Exam Tasks
+
 - Explain React component lifecycle
 - Describe hooks and their purposes
 - Discuss state management in React
 - Explain routing with react-router
 
 ## 12. Key Takeaways
+
 - React is a component-based library for building UIs
 - Components can be functional or class-based
 - Hooks enable state and lifecycle in functional components
@@ -160,7 +181,9 @@ A: Use Context API or state management libraries like Redux.
 - Context API manages global state
 
 ## 13. Advanced Concepts
+
 ### Custom Hooks
+
 ```jsx
 function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -186,16 +209,17 @@ function useLocalStorage(key, initialValue) {
 ```
 
 ### Higher-Order Components (HOC)
+
 ```jsx
 function withAuth(Component) {
   return function AuthenticatedComponent(props) {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (token) {
         // Validate token and set user
-        setUser({ name: 'John' });
+        setUser({ name: "John" });
       }
     }, []);
 
@@ -209,6 +233,7 @@ function withAuth(Component) {
 ```
 
 ### Error Boundaries
+
 ```jsx
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -221,7 +246,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error("Error caught by boundary:", error, errorInfo);
   }
 
   render() {
@@ -235,6 +260,7 @@ class ErrorBoundary extends React.Component {
 ```
 
 ## 14. Common Exam Scenarios
+
 - Build components with state management
 - Implement routing with protection
 - Create forms with validation
@@ -242,4 +268,5 @@ class ErrorBoundary extends React.Component {
 - Handle side effects with useEffect
 
 ---
+
 Refer to your slides (React-2025.pptx.pdf, Authentication.pptx.pdf) for diagrams and more examples.

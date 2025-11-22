@@ -1,7 +1,9 @@
 # DevOps Practical Notes
 
 ## 1. CI/CD Pipeline
+
 ### Example: .gitlab-ci.yml
+
 ```yaml
 stages:
 	- build
@@ -23,7 +25,9 @@ deploy:
 ```
 
 ## 2. Dockerfile
+
 ### Example:
+
 ```Dockerfile
 FROM node:18
 WORKDIR /app
@@ -33,7 +37,9 @@ CMD ["npm", "start"]
 ```
 
 ## 3. docker-compose.yml
+
 ### Example:
+
 ```yaml
 version: '3'
 services:
@@ -48,22 +54,26 @@ services:
 ```
 
 ## 4. Common Pitfalls
+
 - Incorrect YAML syntax in .gitlab-ci.yml
 - Not handling build failures
 - Exposing secrets in code
 
 ## 5. Debugging Tips
+
 - Check GitLab CI/CD logs
 - Test Docker builds locally
 - Use environment variables for secrets
 
 ## 6. Sample Exam Tasks
+
 - Write a CI/CD pipeline for build/test/deploy
 - Write a Dockerfile for your app
 - Use docker-compose.yml for multi-service setup
 - Configure environment variables
 
 ## 7. Full Example: Complete Pipeline
+
 ```yaml
 # .gitlab-ci.yml
 stages:
@@ -101,7 +111,7 @@ deploy:
 
 ```yaml
 # docker-compose.yml
-version: '3'
+version: "3"
 services:
   web:
     image: myapp:main
@@ -117,4 +127,5 @@ services:
 ```
 
 ---
+
 Refer to your codebase and slides for more examples.
