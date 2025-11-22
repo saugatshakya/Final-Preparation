@@ -958,6 +958,1184 @@ describe("UserService", () => {
 });
 ```
 
+## WebSocket Integration for Real-Time Features
+
+Angular provides excellent support for WebSocket connections using RxJS. Let's implement real-time features like chat, notifications, and live data updates.
+
+### WebSocket Service with RxJS
+
+Create a WebSocket service for managing connections:
+
+```bash
+ng generate service websocket
+```
+
+**src/app/services/websocket.service.ts:**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
+import { Observable, Subject, BehaviorSubject, timer } from 'rxjs';
+import { retry, catchError, tap, delayWhen } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
+
+export interface WebSocketMessage {
+  type: string;
+  payload: any;
+  timestamp?: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  message: string;
+  timestamp: number;
+  room?: string;
+}
+
+export interface Notification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  timestamp: number;
+  read?: boolean;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class WebSocketService {
+  private socket$?: WebSocketSubject<WebSocketMessage>;
+  private connectionStatus$ = new BehaviorSubject<boolean>(false);
+  private messages$ = new Subject<WebSocketMessage>();
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000; // Start with 1 second
+
+  // Public observables
+  public connectionStatus = this.connectionStatus$.asObservable();
+  public messages = this.messages$.asObservable();
+
+  constructor() {}
+
+  connect(token?: string): void {
+    if (this.socket$) {
+      this.disconnect();
+    }
+
+    const wsUrl = environment.production
+      ? `ws://192.41.1.117:3000?token=${token || ''}`
+      : `ws://localhost:3000?token=${token || ''}`;
+
+    this.socket$ = webSocket<WebSocketMessage>({
+      url: wsUrl,
+      openObserver: {
+        next: () => {
+          console.log('WebSocket connected');
+          this.connectionStatus$.next(true);
+          this.reconnectAttempts = 0;
+          this.reconnectDelay = 1000;
+        }
+      },
+      closeObserver: {
+        next: () => {
+          console.log('WebSocket disconnected');
+          this.connectionStatus$.next(false);
+          this.attemptReconnect(token);
+        }
+      }
+    });
+
+    // Handle incoming messages
+    this.socket$.pipe(
+      retry({
+        count: this.maxReconnectAttempts,
+        delay: (error, retryCount) => {
+          console.log(`WebSocket retry attempt ${retryCount}`);
+          return timer(this.reconnectDelay * Math.pow(2, retryCount - 1)); // Exponential backoff
+        }
+      }),
+      catchError(error => {
+        console.error('WebSocket error:', error);
+        this.connectionStatus$.next(false);
+        throw error;
+      })
+    ).subscribe({
+      next: (message) => this.messages$.next(message),
+      error: (error) => console.error('WebSocket subscription error:', error)
+    });
+  }
+
+  private attemptReconnect(token?: string): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+      setTimeout(() => {
+        this.connect(token);
+      }, this.reconnectDelay);
+
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // Max 30 seconds
+    } else {
+      console.error('Max reconnection attempts reached');
+    }
+  }
+
+  sendMessage(message: WebSocketMessage): void {
+    if (this.socket$ && this.connectionStatus$.value) {
+      this.socket$.next(message);
+    } else {
+      console.warn('WebSocket not connected, cannot send message');
+    }
+  }
+
+  disconnect(): void {
+    if (this.socket$) {
+      this.socket$.complete();
+      this.socket$ = undefined;
+    }
+    this.connectionStatus$.next(false);
+  }
+
+  // Specific message types
+  sendChatMessage(message: string, room?: string): void {
+    this.sendMessage({
+      type: 'chat',
+      payload: { message, room },
+      timestamp: Date.now()
+    });
+  }
+
+  joinRoom(room: string): void {
+    this.sendMessage({
+      type: 'join_room',
+      payload: { room },
+      timestamp: Date.now()
+    });
+  }
+
+  leaveRoom(room: string): void {
+    this.sendMessage({
+      type: 'leave_room',
+      payload: { room },
+      timestamp: Date.now()
+    });
+  }
+
+  sendTypingIndicator(room?: string): void {
+    this.sendMessage({
+      type: 'typing',
+      payload: { room },
+      timestamp: Date.now()
+    });
+  }
+
+  stopTypingIndicator(room?: string): void {
+    this.sendMessage({
+      type: 'stop_typing',
+      payload: { room },
+      timestamp: Date.now()
+    });
+  }
+}
+```
+
+### Real-Time Chat Component
+
+Create a chat component for real-time messaging:
+
+```bash
+ng generate component chat
+```
+
+**src/app/components/chat/chat.component.ts:**
+
+```typescript
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subject, takeUntil } from 'rxjs';
+import { WebSocketService, ChatMessage, WebSocketMessage } from '../../services/websocket.service';
+
+@Component({
+  selector: 'app-chat',
+  templateUrl: './chat.component.html',
+  styleUrls: ['./chat.component.css']
+})
+export class ChatComponent implements OnInit, OnDestroy {
+  @Input() room?: string;
+  @Input() username = 'Anonymous';
+
+  messages: ChatMessage[] = [];
+  chatForm: FormGroup;
+  isConnected = false;
+  typingUsers: string[] = [];
+  private destroy$ = new Subject<void>();
+
+  constructor(
+    private fb: FormBuilder,
+    private wsService: WebSocketService
+  ) {
+    this.chatForm = this.fb.group({
+      message: ['', [Validators.required, Validators.maxLength(500)]]
+    });
+  }
+
+  ngOnInit(): void {
+    // Subscribe to connection status
+    this.wsService.connectionStatus
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(connected => {
+        this.isConnected = connected;
+        if (connected && this.room) {
+          this.wsService.joinRoom(this.room);
+        }
+      });
+
+    // Subscribe to messages
+    this.wsService.messages
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(message => {
+        this.handleMessage(message);
+      });
+  }
+
+  ngOnDestroy(): void {
+    if (this.room) {
+      this.wsService.leaveRoom(this.room);
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private handleMessage(message: WebSocketMessage): void {
+    switch (message.type) {
+      case 'chat':
+        this.handleChatMessage(message.payload);
+        break;
+      case 'user_joined':
+        this.addSystemMessage(`${message.payload.username} joined the room`);
+        break;
+      case 'user_left':
+        this.addSystemMessage(`${message.payload.username} left the room`);
+        break;
+      case 'typing':
+        this.handleTypingIndicator(message.payload, true);
+        break;
+      case 'stop_typing':
+        this.handleTypingIndicator(message.payload, false);
+        break;
+    }
+  }
+
+  private handleChatMessage(payload: any): void {
+    const chatMessage: ChatMessage = {
+      id: payload.id || Date.now().toString(),
+      userId: payload.userId,
+      username: payload.username,
+      message: payload.message,
+      timestamp: payload.timestamp || Date.now(),
+      room: payload.room
+    };
+    this.messages.push(chatMessage);
+    this.scrollToBottom();
+  }
+
+  private addSystemMessage(text: string): void {
+    const systemMessage: ChatMessage = {
+      id: Date.now().toString(),
+      userId: 'system',
+      username: 'System',
+      message: text,
+      timestamp: Date.now(),
+      room: this.room
+    };
+    this.messages.push(systemMessage);
+    this.scrollToBottom();
+  }
+
+  private handleTypingIndicator(payload: any, isTyping: boolean): void {
+    const username = payload.username;
+    if (isTyping && !this.typingUsers.includes(username)) {
+      this.typingUsers.push(username);
+    } else if (!isTyping) {
+      this.typingUsers = this.typingUsers.filter(user => user !== username);
+    }
+  }
+
+  onSubmit(): void {
+    if (this.chatForm.valid && this.isConnected) {
+      const message = this.chatForm.value.message.trim();
+      if (message) {
+        this.wsService.sendChatMessage(message, this.room);
+        this.chatForm.reset();
+      }
+    }
+  }
+
+  onTyping(): void {
+    if (this.isConnected) {
+      this.wsService.sendTypingIndicator(this.room);
+    }
+  }
+
+  onStopTyping(): void {
+    if (this.isConnected) {
+      this.wsService.stopTypingIndicator(this.room);
+    }
+  }
+
+  private scrollToBottom(): void {
+    setTimeout(() => {
+      const chatContainer = document.querySelector('.chat-messages');
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    });
+  }
+
+  getTypingIndicatorText(): string {
+    if (this.typingUsers.length === 0) return '';
+    if (this.typingUsers.length === 1) {
+      return `${this.typingUsers[0]} is typing...`;
+    }
+    if (this.typingUsers.length === 2) {
+      return `${this.typingUsers[0]} and ${this.typingUsers[1]} are typing...`;
+    }
+    return `${this.typingUsers[0]} and ${this.typingUsers.length - 1} others are typing...`;
+  }
+}
+```
+
+**src/app/components/chat/chat.component.html:**
+
+```html
+<div class="chat-container">
+  <div class="chat-header">
+    <h3>Chat {{room ? '(' + room + ')' : ''}}</h3>
+    <div class="connection-status" [class.connected]="isConnected">
+      {{isConnected ? '🟢 Connected' : '🔴 Disconnected'}}
+    </div>
+  </div>
+
+  <div class="chat-messages" #chatMessages>
+    <div
+      *ngFor="let message of messages"
+      class="message"
+      [class.own-message]="message.username === username"
+      [class.system-message]="message.userId === 'system'"
+    >
+      <div class="message-header">
+        <span class="username">{{message.username}}</span>
+        <span class="timestamp">{{message.timestamp | date:'short'}}</span>
+      </div>
+      <div class="message-content">{{message.message}}</div>
+    </div>
+  </div>
+
+  <div class="typing-indicator" *ngIf="typingUsers.length > 0">
+    {{getTypingIndicatorText()}}
+  </div>
+
+  <form [formGroup]="chatForm" (ngSubmit)="onSubmit()" class="chat-input">
+    <div class="input-group">
+      <input
+        type="text"
+        class="form-control"
+        formControlName="message"
+        placeholder="Type a message..."
+        (input)="onTyping()"
+        (blur)="onStopTyping()"
+        [disabled]="!isConnected"
+        maxlength="500"
+      />
+      <button
+        type="submit"
+        class="btn btn-primary"
+        [disabled]="!chatForm.valid || !isConnected"
+      >
+        Send
+      </button>
+    </div>
+    <div class="character-count" *ngIf="chatForm.value.message">
+      {{chatForm.value.message.length}}/500
+    </div>
+  </form>
+</div>
+```
+
+**src/app/components/chat/chat.component.css:**
+
+```css
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #ddd;
+}
+
+.connection-status {
+  font-size: 0.8em;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: #dc3545;
+  color: white;
+}
+
+.connection-status.connected {
+  background-color: #28a745;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #fafafa;
+}
+
+.message {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: white;
+  border: 1px solid #e9ecef;
+}
+
+.message.own-message {
+  background-color: #007bff;
+  color: white;
+  margin-left: 50px;
+}
+
+.message.system-message {
+  background-color: #f8f9fa;
+  font-style: italic;
+  text-align: center;
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 0.8em;
+}
+
+.username {
+  font-weight: bold;
+}
+
+.timestamp {
+  color: #6c757d;
+}
+
+.message.own-message .timestamp {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.typing-indicator {
+  padding: 5px 15px;
+  font-style: italic;
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+.chat-input {
+  padding: 10px 15px;
+  background-color: white;
+  border-top: 1px solid #ddd;
+}
+
+.input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.input-group .form-control {
+  flex: 1;
+}
+
+.character-count {
+  text-align: right;
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-top: 5px;
+}
+```
+
+### Notification Service
+
+Create a notification service for real-time alerts:
+
+```bash
+ng generate service notification
+```
+
+**src/app/services/notification.service.ts:**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { Notification, WebSocketMessage } from './websocket.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class NotificationService {
+  private notifications$ = new BehaviorSubject<Notification[]>([]);
+  private notificationCount$ = new BehaviorSubject<number>(0);
+
+  public notifications = this.notifications$.asObservable();
+  public notificationCount = this.notificationCount$.asObservable();
+
+  constructor() {}
+
+  addNotification(notification: Notification): void {
+    const currentNotifications = this.notifications$.value;
+    const updatedNotifications = [notification, ...currentNotifications];
+    this.notifications$.next(updatedNotifications);
+    this.updateCount(updatedNotifications);
+  }
+
+  removeNotification(id: string): void {
+    const currentNotifications = this.notifications$.value;
+    const updatedNotifications = currentNotifications.filter(n => n.id !== id);
+    this.notifications$.next(updatedNotifications);
+    this.updateCount(updatedNotifications);
+  }
+
+  markAsRead(id: string): void {
+    const currentNotifications = this.notifications$.value;
+    const updatedNotifications = currentNotifications.map(n =>
+      n.id === id ? { ...n, read: true } : n
+    );
+    this.notifications$.next(updatedNotifications);
+    this.updateCount(updatedNotifications);
+  }
+
+  markAllAsRead(): void {
+    const currentNotifications = this.notifications$.value;
+    const updatedNotifications = currentNotifications.map(n => ({ ...n, read: true }));
+    this.notifications$.next(updatedNotifications);
+    this.updateCount(updatedNotifications);
+  }
+
+  clearAll(): void {
+    this.notifications$.next([]);
+    this.notificationCount$.next(0);
+  }
+
+  private updateCount(notifications: Notification[]): void {
+    const unreadCount = notifications.filter(n => !n.read).length;
+    this.notificationCount$.next(unreadCount);
+  }
+
+  // Handle WebSocket notification messages
+  handleWebSocketMessage(message: WebSocketMessage): void {
+    if (message.type === 'notification') {
+      const notification: Notification = {
+        id: message.payload.id || Date.now().toString(),
+        type: message.payload.type || 'info',
+        title: message.payload.title || 'Notification',
+        message: message.payload.message || '',
+        timestamp: message.payload.timestamp || Date.now(),
+        read: false
+      };
+      this.addNotification(notification);
+    }
+  }
+}
+```
+
+### Notification Component
+
+**src/app/components/notification/notification.component.ts:**
+
+```typescript
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
+import { NotificationService, Notification } from '../../services/notification.service';
+
+@Component({
+  selector: 'app-notification',
+  templateUrl: './notification.component.html',
+  styleUrls: ['./notification.component.css']
+})
+export class NotificationComponent implements OnInit, OnDestroy {
+  notifications: Notification[] = [];
+  unreadCount = 0;
+  showDropdown = false;
+  private destroy$ = new Subject<void>();
+
+  constructor(private notificationService: NotificationService) {}
+
+  ngOnInit(): void {
+    this.notificationService.notifications
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(notifications => {
+        this.notifications = notifications;
+      });
+
+    this.notificationService.notificationCount
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(count => {
+        this.unreadCount = count;
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  toggleDropdown(): void {
+    this.showDropdown = !this.showDropdown;
+  }
+
+  markAsRead(id: string): void {
+    this.notificationService.markAsRead(id);
+  }
+
+  markAllAsRead(): void {
+    this.notificationService.markAllAsRead();
+  }
+
+  removeNotification(id: string): void {
+    this.notificationService.removeNotification(id);
+  }
+
+  clearAll(): void {
+    this.notificationService.clearAll();
+    this.showDropdown = false;
+  }
+
+  getNotificationIcon(type: string): string {
+    switch (type) {
+      case 'success': return '✅';
+      case 'warning': return '⚠️';
+      case 'error': return '❌';
+      default: return 'ℹ️';
+    }
+  }
+}
+```
+
+**src/app/components/notification/notification.component.html:**
+
+```html
+<div class="notification-container">
+  <button
+    class="notification-button"
+    (click)="toggleDropdown()"
+    [class.has-unread]="unreadCount > 0"
+  >
+    🔔
+    <span class="badge" *ngIf="unreadCount > 0">{{unreadCount}}</span>
+  </button>
+
+  <div class="notification-dropdown" *ngIf="showDropdown" (clickOutside)="showDropdown = false">
+    <div class="dropdown-header">
+      <h4>Notifications</h4>
+      <div class="dropdown-actions">
+        <button
+          class="btn btn-sm btn-outline-primary"
+          (click)="markAllAsRead()"
+          [disabled]="unreadCount === 0"
+        >
+          Mark all read
+        </button>
+        <button class="btn btn-sm btn-outline-danger" (click)="clearAll()">
+          Clear all
+        </button>
+      </div>
+    </div>
+
+    <div class="notification-list">
+      <div
+        *ngFor="let notification of notifications"
+        class="notification-item"
+        [class.unread]="!notification.read"
+        (click)="markAsRead(notification.id)"
+      >
+        <div class="notification-icon">
+          {{getNotificationIcon(notification.type)}}
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">{{notification.title}}</div>
+          <div class="notification-message">{{notification.message}}</div>
+          <div class="notification-time">{{notification.timestamp | date:'short'}}</div>
+        </div>
+        <button
+          class="notification-remove"
+          (click)="removeNotification(notification.id); $event.stopPropagation()"
+        >
+          ×
+        </button>
+      </div>
+
+      <div *ngIf="notifications.length === 0" class="no-notifications">
+        No notifications
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### Live Data Updates Service
+
+Create a service for live data synchronization:
+
+```bash
+ng generate service live-data
+```
+
+**src/app/services/live-data.service.ts:**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { WebSocketService, WebSocketMessage } from './websocket.service';
+
+export interface LiveDataItem {
+  id: string;
+  data: any;
+  lastUpdated: number;
+  version: number;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class LiveDataService {
+  private dataSubjects = new Map<string, BehaviorSubject<LiveDataItem[]>>();
+  private dataVersions = new Map<string, number>();
+
+  constructor(private wsService: WebSocketService) {
+    // Subscribe to WebSocket messages for live updates
+    this.wsService.messages.subscribe(message => {
+      this.handleWebSocketMessage(message);
+    });
+  }
+
+  getDataStream(collection: string): Observable<LiveDataItem[]> {
+    if (!this.dataSubjects.has(collection)) {
+      this.dataSubjects.set(collection, new BehaviorSubject<LiveDataItem[]>([]));
+    }
+    return this.dataSubjects.get(collection)!.asObservable();
+  }
+
+  updateData(collection: string, items: LiveDataItem[]): void {
+    if (!this.dataSubjects.has(collection)) {
+      this.dataSubjects.set(collection, new BehaviorSubject<LiveDataItem[]>([]));
+    }
+    this.dataSubjects.get(collection)!.next(items);
+    this.dataVersions.set(collection, Math.max(...items.map(item => item.version), 0));
+  }
+
+  addItem(collection: string, item: LiveDataItem): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const updatedItems = [...currentItems, item];
+    this.updateData(collection, updatedItems);
+
+    // Send to server via WebSocket
+    this.wsService.sendMessage({
+      type: 'data_update',
+      payload: {
+        collection,
+        action: 'add',
+        item
+      },
+      timestamp: Date.now()
+    });
+  }
+
+  updateItem(collection: string, itemId: string, updates: Partial<LiveDataItem>): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const updatedItems = currentItems.map(item =>
+      item.id === itemId ? { ...item, ...updates, lastUpdated: Date.now() } : item
+    );
+    this.updateData(collection, updatedItems);
+
+    // Send to server via WebSocket
+    this.wsService.sendMessage({
+      type: 'data_update',
+      payload: {
+        collection,
+        action: 'update',
+        itemId,
+        updates
+      },
+      timestamp: Date.now()
+    });
+  }
+
+  removeItem(collection: string, itemId: string): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const updatedItems = currentItems.filter(item => item.id !== itemId);
+    this.updateData(collection, updatedItems);
+
+    // Send to server via WebSocket
+    this.wsService.sendMessage({
+      type: 'data_update',
+      payload: {
+        collection,
+        action: 'remove',
+        itemId
+      },
+      timestamp: Date.now()
+    });
+  }
+
+  private handleWebSocketMessage(message: WebSocketMessage): void {
+    if (message.type === 'data_update') {
+      const { collection, action, item, itemId, updates } = message.payload;
+
+      switch (action) {
+        case 'add':
+          if (item) {
+            this.addItemToCollection(collection, item);
+          }
+          break;
+        case 'update':
+          if (itemId && updates) {
+            this.updateItemInCollection(collection, itemId, updates);
+          }
+          break;
+        case 'remove':
+          if (itemId) {
+            this.removeItemFromCollection(collection, itemId);
+          }
+          break;
+        case 'sync':
+          if (item) {
+            this.syncCollection(collection, item);
+          }
+          break;
+      }
+    }
+  }
+
+  private addItemToCollection(collection: string, item: LiveDataItem): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const existingIndex = currentItems.findIndex(i => i.id === item.id);
+
+    if (existingIndex === -1) {
+      const updatedItems = [...currentItems, item];
+      this.updateData(collection, updatedItems);
+    } else {
+      // Update existing item if newer version
+      const existingItem = currentItems[existingIndex];
+      if (item.version > existingItem.version) {
+        const updatedItems = [...currentItems];
+        updatedItems[existingIndex] = item;
+        this.updateData(collection, updatedItems);
+      }
+    }
+  }
+
+  private updateItemInCollection(collection: string, itemId: string, updates: Partial<LiveDataItem>): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const updatedItems = currentItems.map(item =>
+      item.id === itemId ? { ...item, ...updates, lastUpdated: Date.now() } : item
+    );
+    this.updateData(collection, updatedItems);
+  }
+
+  private removeItemFromCollection(collection: string, itemId: string): void {
+    const currentItems = this.dataSubjects.get(collection)?.value || [];
+    const updatedItems = currentItems.filter(item => item.id !== itemId);
+    this.updateData(collection, updatedItems);
+  }
+
+  private syncCollection(collection: string, items: LiveDataItem[]): void {
+    this.updateData(collection, items);
+  }
+}
+```
+
+### Integrating WebSocket with Authentication
+
+Update your authentication service to handle WebSocket connections:
+
+**src/app/services/auth.service.ts:**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { WebSocketService } from './websocket.service';
+import { environment } from '../../environments/environment';
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  token?: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private currentUser$ = new BehaviorSubject<User | null>(null);
+  public currentUser = this.currentUser$.asObservable();
+
+  constructor(
+    private http: HttpClient,
+    private wsService: WebSocketService
+  ) {
+    // Load user from localStorage on app start
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      this.currentUser$.next(user);
+      // Connect WebSocket with token
+      this.wsService.connect(user.token);
+    }
+  }
+
+  login(credentials: { email: string; password: string }): Observable<User> {
+    return this.http.post<User>(`${environment.apiUrl}/auth/login`, credentials)
+      .pipe(
+        tap(user => {
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          this.currentUser$.next(user);
+          // Connect WebSocket with new token
+          this.wsService.connect(user.token);
+        })
+      );
+  }
+
+  register(userData: { username: string; email: string; password: string }): Observable<User> {
+    return this.http.post<User>(`${environment.apiUrl}/auth/register`, userData)
+      .pipe(
+        tap(user => {
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          this.currentUser$.next(user);
+          // Connect WebSocket with new token
+          this.wsService.connect(user.token);
+        })
+      );
+  }
+
+  logout(): void {
+    localStorage.removeItem('currentUser');
+    this.currentUser$.next(null);
+    this.wsService.disconnect();
+  }
+
+  getToken(): string | null {
+    const user = this.currentUser$.value;
+    return user?.token || null;
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.currentUser$.value;
+  }
+}
+```
+
+### Testing WebSocket Integration
+
+**websocket.service.spec.ts:**
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { WebSocketService } from './websocket.service';
+
+describe('WebSocketService', () => {
+  let service: WebSocketService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(WebSocketService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  it('should handle connection status changes', (done) => {
+    service.connectionStatus.subscribe(connected => {
+      if (connected === false) {
+        // Initially disconnected
+        expect(connected).toBeFalse();
+        done();
+      }
+    });
+  });
+
+  it('should send messages when connected', () => {
+    spyOn(console, 'warn');
+    service.sendMessage({ type: 'test', payload: {} });
+    expect(console.warn).toHaveBeenCalledWith('WebSocket not connected, cannot send message');
+  });
+});
+```
+
+**chat.component.spec.ts:**
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ReactiveFormsModule } from '@angular/forms';
+import { ChatComponent } from './chat.component';
+import { WebSocketService } from '../../services/websocket.service';
+
+describe('ChatComponent', () => {
+  let component: ChatComponent;
+  let fixture: ComponentFixture<ChatComponent>;
+  let wsServiceSpy: jasmine.SpyObj<WebSocketService>;
+
+  beforeEach(async () => {
+    const spy = jasmine.createSpyObj('WebSocketService', [
+      'connectionStatus', 'messages', 'sendChatMessage', 'joinRoom', 'leaveRoom'
+    ]);
+
+    await TestBed.configureTestingModule({
+      declarations: [ChatComponent],
+      imports: [ReactiveFormsModule],
+      providers: [{ provide: WebSocketService, useValue: spy }]
+    }).compileComponents();
+
+    wsServiceSpy = TestBed.inject(WebSocketService) as jasmine.SpyObj<WebSocketService>;
+  });
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(ChatComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should send message when form is submitted', () => {
+    component.chatForm.setValue({ message: 'Test message' });
+    component.onSubmit();
+    expect(wsServiceSpy.sendChatMessage).toHaveBeenCalledWith('Test message', undefined);
+  });
+});
+```
+
+### Production Configuration
+
+Update your environment files for production:
+
+**src/environments/environment.prod.ts:**
+
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'http://192.41.1.117:7000/api',
+  wsUrl: 'ws://192.41.1.117:3000'
+};
+```
+
+**src/environments/environment.ts:**
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:7000/api',
+  wsUrl: 'ws://localhost:3000'
+};
+```
+
+### Docker Configuration with WebSocket
+
+Update your Docker setup to support WebSocket connections:
+
+**docker-compose.yml:**
+
+```yaml
+version: '3.8'
+
+services:
+  angular-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://192.41.1.117:7000/api
+      - WS_URL=ws://192.41.1.117:3000
+    networks:
+      - app-network
+
+  backend:
+    # Your backend service configuration
+    ports:
+      - "7000:7000"
+    environment:
+      - WS_PORT=3000
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+```
+
+### Usage in Components
+
+Here's how to use the WebSocket features in your app:
+
+**app.component.html:**
+
+```html
+<div class="app-container">
+  <app-notification></app-notification>
+
+  <div class="main-content">
+    <app-chat [room]="'general'" [username]="currentUser?.username"></app-chat>
+  </div>
+</div>
+```
+
+**app.component.ts:**
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { AuthService, User } from './services/auth.service';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent implements OnInit {
+  currentUser: User | null = null;
+
+  constructor(private authService: AuthService) {}
+
+  ngOnInit(): void {
+    this.authService.currentUser.subscribe(user => {
+      this.currentUser = user;
+    });
+  }
+}
+```
+
+Your Angular app now has comprehensive real-time capabilities! The WebSocket integration provides chat, notifications, and live data updates with proper error handling and reconnection logic.
+
 ## Docker Configuration
 
 ### Development Dockerfile
