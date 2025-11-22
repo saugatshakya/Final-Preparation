@@ -973,11 +973,11 @@ ng generate service websocket
 **src/app/services/websocket.service.ts:**
 
 ```typescript
-import { Injectable } from '@angular/core';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { Observable, Subject, BehaviorSubject, timer } from 'rxjs';
-import { retry, catchError, tap, delayWhen } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+import { Injectable } from "@angular/core";
+import { webSocket, WebSocketSubject } from "rxjs/webSocket";
+import { Observable, Subject, BehaviorSubject, timer } from "rxjs";
+import { retry, catchError, tap, delayWhen } from "rxjs/operators";
+import { environment } from "../../environments/environment";
 
 export interface WebSocketMessage {
   type: string;
@@ -996,7 +996,7 @@ export interface ChatMessage {
 
 export interface Notification {
   id: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   title: string;
   message: string;
   timestamp: number;
@@ -1004,7 +1004,7 @@ export interface Notification {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class WebSocketService {
   private socket$?: WebSocketSubject<WebSocketMessage>;
@@ -1026,52 +1026,56 @@ export class WebSocketService {
     }
 
     const wsUrl = environment.production
-      ? `ws://192.41.1.117:3000?token=${token || ''}`
-      : `ws://localhost:3000?token=${token || ''}`;
+      ? `ws://192.41.1.117:3000?token=${token || ""}`
+      : `ws://localhost:3000?token=${token || ""}`;
 
     this.socket$ = webSocket<WebSocketMessage>({
       url: wsUrl,
       openObserver: {
         next: () => {
-          console.log('WebSocket connected');
+          console.log("WebSocket connected");
           this.connectionStatus$.next(true);
           this.reconnectAttempts = 0;
           this.reconnectDelay = 1000;
-        }
+        },
       },
       closeObserver: {
         next: () => {
-          console.log('WebSocket disconnected');
+          console.log("WebSocket disconnected");
           this.connectionStatus$.next(false);
           this.attemptReconnect(token);
-        }
-      }
+        },
+      },
     });
 
     // Handle incoming messages
-    this.socket$.pipe(
-      retry({
-        count: this.maxReconnectAttempts,
-        delay: (error, retryCount) => {
-          console.log(`WebSocket retry attempt ${retryCount}`);
-          return timer(this.reconnectDelay * Math.pow(2, retryCount - 1)); // Exponential backoff
-        }
-      }),
-      catchError(error => {
-        console.error('WebSocket error:', error);
-        this.connectionStatus$.next(false);
-        throw error;
-      })
-    ).subscribe({
-      next: (message) => this.messages$.next(message),
-      error: (error) => console.error('WebSocket subscription error:', error)
-    });
+    this.socket$
+      .pipe(
+        retry({
+          count: this.maxReconnectAttempts,
+          delay: (error, retryCount) => {
+            console.log(`WebSocket retry attempt ${retryCount}`);
+            return timer(this.reconnectDelay * Math.pow(2, retryCount - 1)); // Exponential backoff
+          },
+        }),
+        catchError((error) => {
+          console.error("WebSocket error:", error);
+          this.connectionStatus$.next(false);
+          throw error;
+        })
+      )
+      .subscribe({
+        next: (message) => this.messages$.next(message),
+        error: (error) => console.error("WebSocket subscription error:", error),
+      });
   }
 
   private attemptReconnect(token?: string): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      console.log(
+        `Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+      );
 
       setTimeout(() => {
         this.connect(token);
@@ -1079,7 +1083,7 @@ export class WebSocketService {
 
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // Max 30 seconds
     } else {
-      console.error('Max reconnection attempts reached');
+      console.error("Max reconnection attempts reached");
     }
   }
 
@@ -1087,7 +1091,7 @@ export class WebSocketService {
     if (this.socket$ && this.connectionStatus$.value) {
       this.socket$.next(message);
     } else {
-      console.warn('WebSocket not connected, cannot send message');
+      console.warn("WebSocket not connected, cannot send message");
     }
   }
 
@@ -1102,41 +1106,41 @@ export class WebSocketService {
   // Specific message types
   sendChatMessage(message: string, room?: string): void {
     this.sendMessage({
-      type: 'chat',
+      type: "chat",
       payload: { message, room },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   joinRoom(room: string): void {
     this.sendMessage({
-      type: 'join_room',
+      type: "join_room",
       payload: { room },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   leaveRoom(room: string): void {
     this.sendMessage({
-      type: 'leave_room',
+      type: "leave_room",
       payload: { room },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   sendTypingIndicator(room?: string): void {
     this.sendMessage({
-      type: 'typing',
+      type: "typing",
       payload: { room },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   stopTypingIndicator(room?: string): void {
     this.sendMessage({
-      type: 'stop_typing',
+      type: "stop_typing",
       payload: { room },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 }
@@ -1153,19 +1157,23 @@ ng generate component chat
 **src/app/components/chat/chat.component.ts:**
 
 ```typescript
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
-import { WebSocketService, ChatMessage, WebSocketMessage } from '../../services/websocket.service';
+import { Component, OnInit, OnDestroy, Input } from "@angular/core";
+import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { Subject, takeUntil } from "rxjs";
+import {
+  WebSocketService,
+  ChatMessage,
+  WebSocketMessage,
+} from "../../services/websocket.service";
 
 @Component({
-  selector: 'app-chat',
-  templateUrl: './chat.component.html',
-  styleUrls: ['./chat.component.css']
+  selector: "app-chat",
+  templateUrl: "./chat.component.html",
+  styleUrls: ["./chat.component.css"],
 })
 export class ChatComponent implements OnInit, OnDestroy {
   @Input() room?: string;
-  @Input() username = 'Anonymous';
+  @Input() username = "Anonymous";
 
   messages: ChatMessage[] = [];
   chatForm: FormGroup;
@@ -1173,12 +1181,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   typingUsers: string[] = [];
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private fb: FormBuilder,
-    private wsService: WebSocketService
-  ) {
+  constructor(private fb: FormBuilder, private wsService: WebSocketService) {
     this.chatForm = this.fb.group({
-      message: ['', [Validators.required, Validators.maxLength(500)]]
+      message: ["", [Validators.required, Validators.maxLength(500)]],
     });
   }
 
@@ -1186,7 +1191,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     // Subscribe to connection status
     this.wsService.connectionStatus
       .pipe(takeUntil(this.destroy$))
-      .subscribe(connected => {
+      .subscribe((connected) => {
         this.isConnected = connected;
         if (connected && this.room) {
           this.wsService.joinRoom(this.room);
@@ -1196,7 +1201,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     // Subscribe to messages
     this.wsService.messages
       .pipe(takeUntil(this.destroy$))
-      .subscribe(message => {
+      .subscribe((message) => {
         this.handleMessage(message);
       });
   }
@@ -1211,19 +1216,19 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   private handleMessage(message: WebSocketMessage): void {
     switch (message.type) {
-      case 'chat':
+      case "chat":
         this.handleChatMessage(message.payload);
         break;
-      case 'user_joined':
+      case "user_joined":
         this.addSystemMessage(`${message.payload.username} joined the room`);
         break;
-      case 'user_left':
+      case "user_left":
         this.addSystemMessage(`${message.payload.username} left the room`);
         break;
-      case 'typing':
+      case "typing":
         this.handleTypingIndicator(message.payload, true);
         break;
-      case 'stop_typing':
+      case "stop_typing":
         this.handleTypingIndicator(message.payload, false);
         break;
     }
@@ -1236,7 +1241,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       username: payload.username,
       message: payload.message,
       timestamp: payload.timestamp || Date.now(),
-      room: payload.room
+      room: payload.room,
     };
     this.messages.push(chatMessage);
     this.scrollToBottom();
@@ -1245,11 +1250,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   private addSystemMessage(text: string): void {
     const systemMessage: ChatMessage = {
       id: Date.now().toString(),
-      userId: 'system',
-      username: 'System',
+      userId: "system",
+      username: "System",
       message: text,
       timestamp: Date.now(),
-      room: this.room
+      room: this.room,
     };
     this.messages.push(systemMessage);
     this.scrollToBottom();
@@ -1260,7 +1265,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     if (isTyping && !this.typingUsers.includes(username)) {
       this.typingUsers.push(username);
     } else if (!isTyping) {
-      this.typingUsers = this.typingUsers.filter(user => user !== username);
+      this.typingUsers = this.typingUsers.filter((user) => user !== username);
     }
   }
 
@@ -1288,7 +1293,7 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   private scrollToBottom(): void {
     setTimeout(() => {
-      const chatContainer = document.querySelector('.chat-messages');
+      const chatContainer = document.querySelector(".chat-messages");
       if (chatContainer) {
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }
@@ -1296,14 +1301,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   getTypingIndicatorText(): string {
-    if (this.typingUsers.length === 0) return '';
+    if (this.typingUsers.length === 0) return "";
     if (this.typingUsers.length === 1) {
       return `${this.typingUsers[0]} is typing...`;
     }
     if (this.typingUsers.length === 2) {
       return `${this.typingUsers[0]} and ${this.typingUsers[1]} are typing...`;
     }
-    return `${this.typingUsers[0]} and ${this.typingUsers.length - 1} others are typing...`;
+    return `${this.typingUsers[0]} and ${
+      this.typingUsers.length - 1
+    } others are typing...`;
   }
 }
 ```
@@ -1487,12 +1494,12 @@ ng generate service notification
 **src/app/services/notification.service.ts:**
 
 ```typescript
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Notification, WebSocketMessage } from './websocket.service';
+import { Injectable } from "@angular/core";
+import { BehaviorSubject, Observable } from "rxjs";
+import { Notification, WebSocketMessage } from "./websocket.service";
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class NotificationService {
   private notifications$ = new BehaviorSubject<Notification[]>([]);
@@ -1512,14 +1519,16 @@ export class NotificationService {
 
   removeNotification(id: string): void {
     const currentNotifications = this.notifications$.value;
-    const updatedNotifications = currentNotifications.filter(n => n.id !== id);
+    const updatedNotifications = currentNotifications.filter(
+      (n) => n.id !== id
+    );
     this.notifications$.next(updatedNotifications);
     this.updateCount(updatedNotifications);
   }
 
   markAsRead(id: string): void {
     const currentNotifications = this.notifications$.value;
-    const updatedNotifications = currentNotifications.map(n =>
+    const updatedNotifications = currentNotifications.map((n) =>
       n.id === id ? { ...n, read: true } : n
     );
     this.notifications$.next(updatedNotifications);
@@ -1528,7 +1537,10 @@ export class NotificationService {
 
   markAllAsRead(): void {
     const currentNotifications = this.notifications$.value;
-    const updatedNotifications = currentNotifications.map(n => ({ ...n, read: true }));
+    const updatedNotifications = currentNotifications.map((n) => ({
+      ...n,
+      read: true,
+    }));
     this.notifications$.next(updatedNotifications);
     this.updateCount(updatedNotifications);
   }
@@ -1539,20 +1551,20 @@ export class NotificationService {
   }
 
   private updateCount(notifications: Notification[]): void {
-    const unreadCount = notifications.filter(n => !n.read).length;
+    const unreadCount = notifications.filter((n) => !n.read).length;
     this.notificationCount$.next(unreadCount);
   }
 
   // Handle WebSocket notification messages
   handleWebSocketMessage(message: WebSocketMessage): void {
-    if (message.type === 'notification') {
+    if (message.type === "notification") {
       const notification: Notification = {
         id: message.payload.id || Date.now().toString(),
-        type: message.payload.type || 'info',
-        title: message.payload.title || 'Notification',
-        message: message.payload.message || '',
+        type: message.payload.type || "info",
+        title: message.payload.title || "Notification",
+        message: message.payload.message || "",
         timestamp: message.payload.timestamp || Date.now(),
-        read: false
+        read: false,
       };
       this.addNotification(notification);
     }
@@ -1565,14 +1577,17 @@ export class NotificationService {
 **src/app/components/notification/notification.component.ts:**
 
 ```typescript
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
-import { NotificationService, Notification } from '../../services/notification.service';
+import { Component, OnInit, OnDestroy } from "@angular/core";
+import { Subject, takeUntil } from "rxjs";
+import {
+  NotificationService,
+  Notification,
+} from "../../services/notification.service";
 
 @Component({
-  selector: 'app-notification',
-  templateUrl: './notification.component.html',
-  styleUrls: ['./notification.component.css']
+  selector: "app-notification",
+  templateUrl: "./notification.component.html",
+  styleUrls: ["./notification.component.css"],
 })
 export class NotificationComponent implements OnInit, OnDestroy {
   notifications: Notification[] = [];
@@ -1585,13 +1600,13 @@ export class NotificationComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.notificationService.notifications
       .pipe(takeUntil(this.destroy$))
-      .subscribe(notifications => {
+      .subscribe((notifications) => {
         this.notifications = notifications;
       });
 
     this.notificationService.notificationCount
       .pipe(takeUntil(this.destroy$))
-      .subscribe(count => {
+      .subscribe((count) => {
         this.unreadCount = count;
       });
   }
@@ -1624,10 +1639,14 @@ export class NotificationComponent implements OnInit, OnDestroy {
 
   getNotificationIcon(type: string): string {
     switch (type) {
-      case 'success': return '✅';
-      case 'warning': return '⚠️';
-      case 'error': return '❌';
-      default: return 'ℹ️';
+      case "success":
+        return "✅";
+      case "warning":
+        return "⚠️";
+      case "error":
+        return "❌";
+      default:
+        return "ℹ️";
     }
   }
 }
@@ -1646,7 +1665,11 @@ export class NotificationComponent implements OnInit, OnDestroy {
     <span class="badge" *ngIf="unreadCount > 0">{{unreadCount}}</span>
   </button>
 
-  <div class="notification-dropdown" *ngIf="showDropdown" (clickOutside)="showDropdown = false">
+  <div
+    class="notification-dropdown"
+    *ngIf="showDropdown"
+    (clickOutside)="showDropdown = false"
+  >
     <div class="dropdown-header">
       <h4>Notifications</h4>
       <div class="dropdown-actions">
@@ -1676,7 +1699,9 @@ export class NotificationComponent implements OnInit, OnDestroy {
         <div class="notification-content">
           <div class="notification-title">{{notification.title}}</div>
           <div class="notification-message">{{notification.message}}</div>
-          <div class="notification-time">{{notification.timestamp | date:'short'}}</div>
+          <div class="notification-time">
+            {{notification.timestamp | date:'short'}}
+          </div>
         </div>
         <button
           class="notification-remove"
@@ -1705,9 +1730,9 @@ ng generate service live-data
 **src/app/services/live-data.service.ts:**
 
 ```typescript
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { WebSocketService, WebSocketMessage } from './websocket.service';
+import { Injectable } from "@angular/core";
+import { BehaviorSubject, Observable } from "rxjs";
+import { WebSocketService, WebSocketMessage } from "./websocket.service";
 
 export interface LiveDataItem {
   id: string;
@@ -1717,7 +1742,7 @@ export interface LiveDataItem {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class LiveDataService {
   private dataSubjects = new Map<string, BehaviorSubject<LiveDataItem[]>>();
@@ -1725,24 +1750,33 @@ export class LiveDataService {
 
   constructor(private wsService: WebSocketService) {
     // Subscribe to WebSocket messages for live updates
-    this.wsService.messages.subscribe(message => {
+    this.wsService.messages.subscribe((message) => {
       this.handleWebSocketMessage(message);
     });
   }
 
   getDataStream(collection: string): Observable<LiveDataItem[]> {
     if (!this.dataSubjects.has(collection)) {
-      this.dataSubjects.set(collection, new BehaviorSubject<LiveDataItem[]>([]));
+      this.dataSubjects.set(
+        collection,
+        new BehaviorSubject<LiveDataItem[]>([])
+      );
     }
     return this.dataSubjects.get(collection)!.asObservable();
   }
 
   updateData(collection: string, items: LiveDataItem[]): void {
     if (!this.dataSubjects.has(collection)) {
-      this.dataSubjects.set(collection, new BehaviorSubject<LiveDataItem[]>([]));
+      this.dataSubjects.set(
+        collection,
+        new BehaviorSubject<LiveDataItem[]>([])
+      );
     }
     this.dataSubjects.get(collection)!.next(items);
-    this.dataVersions.set(collection, Math.max(...items.map(item => item.version), 0));
+    this.dataVersions.set(
+      collection,
+      Math.max(...items.map((item) => item.version), 0)
+    );
   }
 
   addItem(collection: string, item: LiveDataItem): void {
@@ -1752,74 +1786,80 @@ export class LiveDataService {
 
     // Send to server via WebSocket
     this.wsService.sendMessage({
-      type: 'data_update',
+      type: "data_update",
       payload: {
         collection,
-        action: 'add',
-        item
+        action: "add",
+        item,
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
-  updateItem(collection: string, itemId: string, updates: Partial<LiveDataItem>): void {
+  updateItem(
+    collection: string,
+    itemId: string,
+    updates: Partial<LiveDataItem>
+  ): void {
     const currentItems = this.dataSubjects.get(collection)?.value || [];
-    const updatedItems = currentItems.map(item =>
-      item.id === itemId ? { ...item, ...updates, lastUpdated: Date.now() } : item
+    const updatedItems = currentItems.map((item) =>
+      item.id === itemId
+        ? { ...item, ...updates, lastUpdated: Date.now() }
+        : item
     );
     this.updateData(collection, updatedItems);
 
     // Send to server via WebSocket
     this.wsService.sendMessage({
-      type: 'data_update',
+      type: "data_update",
       payload: {
         collection,
-        action: 'update',
+        action: "update",
         itemId,
-        updates
+        updates,
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   removeItem(collection: string, itemId: string): void {
     const currentItems = this.dataSubjects.get(collection)?.value || [];
-    const updatedItems = currentItems.filter(item => item.id !== itemId);
+    const updatedItems = currentItems.filter((item) => item.id !== itemId);
     this.updateData(collection, updatedItems);
 
     // Send to server via WebSocket
     this.wsService.sendMessage({
-      type: 'data_update',
+      type: "data_update",
       payload: {
         collection,
-        action: 'remove',
-        itemId
+        action: "remove",
+        itemId,
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   private handleWebSocketMessage(message: WebSocketMessage): void {
-    if (message.type === 'data_update') {
+    if (message.type === "data_update") {
       const { collection, action, item, itemId, updates } = message.payload;
 
       switch (action) {
-        case 'add':
+        case "add":
           if (item) {
             this.addItemToCollection(collection, item);
           }
           break;
-        case 'update':
+        case "update":
           if (itemId && updates) {
             this.updateItemInCollection(collection, itemId, updates);
           }
           break;
-        case 'remove':
+        case "remove":
           if (itemId) {
             this.removeItemFromCollection(collection, itemId);
           }
           break;
-        case 'sync':
+        case "sync":
           if (item) {
             this.syncCollection(collection, item);
           }
@@ -1830,7 +1870,7 @@ export class LiveDataService {
 
   private addItemToCollection(collection: string, item: LiveDataItem): void {
     const currentItems = this.dataSubjects.get(collection)?.value || [];
-    const existingIndex = currentItems.findIndex(i => i.id === item.id);
+    const existingIndex = currentItems.findIndex((i) => i.id === item.id);
 
     if (existingIndex === -1) {
       const updatedItems = [...currentItems, item];
@@ -1846,17 +1886,23 @@ export class LiveDataService {
     }
   }
 
-  private updateItemInCollection(collection: string, itemId: string, updates: Partial<LiveDataItem>): void {
+  private updateItemInCollection(
+    collection: string,
+    itemId: string,
+    updates: Partial<LiveDataItem>
+  ): void {
     const currentItems = this.dataSubjects.get(collection)?.value || [];
-    const updatedItems = currentItems.map(item =>
-      item.id === itemId ? { ...item, ...updates, lastUpdated: Date.now() } : item
+    const updatedItems = currentItems.map((item) =>
+      item.id === itemId
+        ? { ...item, ...updates, lastUpdated: Date.now() }
+        : item
     );
     this.updateData(collection, updatedItems);
   }
 
   private removeItemFromCollection(collection: string, itemId: string): void {
     const currentItems = this.dataSubjects.get(collection)?.value || [];
-    const updatedItems = currentItems.filter(item => item.id !== itemId);
+    const updatedItems = currentItems.filter((item) => item.id !== itemId);
     this.updateData(collection, updatedItems);
   }
 
@@ -1873,12 +1919,12 @@ Update your authentication service to handle WebSocket connections:
 **src/app/services/auth.service.ts:**
 
 ```typescript
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { WebSocketService } from './websocket.service';
-import { environment } from '../../environments/environment';
+import { Injectable } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+import { BehaviorSubject, Observable } from "rxjs";
+import { tap } from "rxjs/operators";
+import { WebSocketService } from "./websocket.service";
+import { environment } from "../../environments/environment";
 
 export interface User {
   id: string;
@@ -1888,18 +1934,15 @@ export interface User {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class AuthService {
   private currentUser$ = new BehaviorSubject<User | null>(null);
   public currentUser = this.currentUser$.asObservable();
 
-  constructor(
-    private http: HttpClient,
-    private wsService: WebSocketService
-  ) {
+  constructor(private http: HttpClient, private wsService: WebSocketService) {
     // Load user from localStorage on app start
-    const savedUser = localStorage.getItem('currentUser');
+    const savedUser = localStorage.getItem("currentUser");
     if (savedUser) {
       const user = JSON.parse(savedUser);
       this.currentUser$.next(user);
@@ -1909,10 +1952,11 @@ export class AuthService {
   }
 
   login(credentials: { email: string; password: string }): Observable<User> {
-    return this.http.post<User>(`${environment.apiUrl}/auth/login`, credentials)
+    return this.http
+      .post<User>(`${environment.apiUrl}/auth/login`, credentials)
       .pipe(
-        tap(user => {
-          localStorage.setItem('currentUser', JSON.stringify(user));
+        tap((user) => {
+          localStorage.setItem("currentUser", JSON.stringify(user));
           this.currentUser$.next(user);
           // Connect WebSocket with new token
           this.wsService.connect(user.token);
@@ -1920,11 +1964,16 @@ export class AuthService {
       );
   }
 
-  register(userData: { username: string; email: string; password: string }): Observable<User> {
-    return this.http.post<User>(`${environment.apiUrl}/auth/register`, userData)
+  register(userData: {
+    username: string;
+    email: string;
+    password: string;
+  }): Observable<User> {
+    return this.http
+      .post<User>(`${environment.apiUrl}/auth/register`, userData)
       .pipe(
-        tap(user => {
-          localStorage.setItem('currentUser', JSON.stringify(user));
+        tap((user) => {
+          localStorage.setItem("currentUser", JSON.stringify(user));
           this.currentUser$.next(user);
           // Connect WebSocket with new token
           this.wsService.connect(user.token);
@@ -1933,7 +1982,7 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem('currentUser');
+    localStorage.removeItem("currentUser");
     this.currentUser$.next(null);
     this.wsService.disconnect();
   }
@@ -1954,10 +2003,10 @@ export class AuthService {
 **websocket.service.spec.ts:**
 
 ```typescript
-import { TestBed } from '@angular/core/testing';
-import { WebSocketService } from './websocket.service';
+import { TestBed } from "@angular/core/testing";
+import { WebSocketService } from "./websocket.service";
 
-describe('WebSocketService', () => {
+describe("WebSocketService", () => {
   let service: WebSocketService;
 
   beforeEach(() => {
@@ -1965,12 +2014,12 @@ describe('WebSocketService', () => {
     service = TestBed.inject(WebSocketService);
   });
 
-  it('should be created', () => {
+  it("should be created", () => {
     expect(service).toBeTruthy();
   });
 
-  it('should handle connection status changes', (done) => {
-    service.connectionStatus.subscribe(connected => {
+  it("should handle connection status changes", (done) => {
+    service.connectionStatus.subscribe((connected) => {
       if (connected === false) {
         // Initially disconnected
         expect(connected).toBeFalse();
@@ -1979,10 +2028,12 @@ describe('WebSocketService', () => {
     });
   });
 
-  it('should send messages when connected', () => {
-    spyOn(console, 'warn');
-    service.sendMessage({ type: 'test', payload: {} });
-    expect(console.warn).toHaveBeenCalledWith('WebSocket not connected, cannot send message');
+  it("should send messages when connected", () => {
+    spyOn(console, "warn");
+    service.sendMessage({ type: "test", payload: {} });
+    expect(console.warn).toHaveBeenCalledWith(
+      "WebSocket not connected, cannot send message"
+    );
   });
 });
 ```
@@ -1990,28 +2041,34 @@ describe('WebSocketService', () => {
 **chat.component.spec.ts:**
 
 ```typescript
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ReactiveFormsModule } from '@angular/forms';
-import { ChatComponent } from './chat.component';
-import { WebSocketService } from '../../services/websocket.service';
+import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { ReactiveFormsModule } from "@angular/forms";
+import { ChatComponent } from "./chat.component";
+import { WebSocketService } from "../../services/websocket.service";
 
-describe('ChatComponent', () => {
+describe("ChatComponent", () => {
   let component: ChatComponent;
   let fixture: ComponentFixture<ChatComponent>;
   let wsServiceSpy: jasmine.SpyObj<WebSocketService>;
 
   beforeEach(async () => {
-    const spy = jasmine.createSpyObj('WebSocketService', [
-      'connectionStatus', 'messages', 'sendChatMessage', 'joinRoom', 'leaveRoom'
+    const spy = jasmine.createSpyObj("WebSocketService", [
+      "connectionStatus",
+      "messages",
+      "sendChatMessage",
+      "joinRoom",
+      "leaveRoom",
     ]);
 
     await TestBed.configureTestingModule({
       declarations: [ChatComponent],
       imports: [ReactiveFormsModule],
-      providers: [{ provide: WebSocketService, useValue: spy }]
+      providers: [{ provide: WebSocketService, useValue: spy }],
     }).compileComponents();
 
-    wsServiceSpy = TestBed.inject(WebSocketService) as jasmine.SpyObj<WebSocketService>;
+    wsServiceSpy = TestBed.inject(
+      WebSocketService
+    ) as jasmine.SpyObj<WebSocketService>;
   });
 
   beforeEach(() => {
@@ -2020,14 +2077,17 @@ describe('ChatComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 
-  it('should send message when form is submitted', () => {
-    component.chatForm.setValue({ message: 'Test message' });
+  it("should send message when form is submitted", () => {
+    component.chatForm.setValue({ message: "Test message" });
     component.onSubmit();
-    expect(wsServiceSpy.sendChatMessage).toHaveBeenCalledWith('Test message', undefined);
+    expect(wsServiceSpy.sendChatMessage).toHaveBeenCalledWith(
+      "Test message",
+      undefined
+    );
   });
 });
 ```
@@ -2041,8 +2101,8 @@ Update your environment files for production:
 ```typescript
 export const environment = {
   production: true,
-  apiUrl: 'http://192.41.1.117:7000/api',
-  wsUrl: 'ws://192.41.1.117:3000'
+  apiUrl: "http://192.41.1.117:7000/api",
+  wsUrl: "ws://192.41.1.117:3000",
 };
 ```
 
@@ -2051,8 +2111,8 @@ export const environment = {
 ```typescript
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:7000/api',
-  wsUrl: 'ws://localhost:3000'
+  apiUrl: "http://localhost:7000/api",
+  wsUrl: "ws://localhost:3000",
 };
 ```
 
@@ -2063,7 +2123,7 @@ Update your Docker setup to support WebSocket connections:
 **docker-compose.yml:**
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   angular-app:
@@ -2113,13 +2173,13 @@ Here's how to use the WebSocket features in your app:
 **app.component.ts:**
 
 ```typescript
-import { Component, OnInit } from '@angular/core';
-import { AuthService, User } from './services/auth.service';
+import { Component, OnInit } from "@angular/core";
+import { AuthService, User } from "./services/auth.service";
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  selector: "app-root",
+  templateUrl: "./app.component.html",
+  styleUrls: ["./app.component.css"],
 })
 export class AppComponent implements OnInit {
   currentUser: User | null = null;
@@ -2127,7 +2187,7 @@ export class AppComponent implements OnInit {
   constructor(private authService: AuthService) {}
 
   ngOnInit(): void {
-    this.authService.currentUser.subscribe(user => {
+    this.authService.currentUser.subscribe((user) => {
       this.currentUser = user;
     });
   }

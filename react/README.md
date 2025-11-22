@@ -1396,7 +1396,7 @@ Create a reusable WebSocket hook for connection management:
 
 ```jsx
 // src/hooks/useWebSocket.js
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export const useWebSocket = (url, token = null) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -1415,7 +1415,7 @@ export const useWebSocket = (url, token = null) => {
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
-        console.log('WebSocket connected');
+        console.log("WebSocket connected");
         setIsConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
@@ -1424,35 +1424,42 @@ export const useWebSocket = (url, token = null) => {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setMessages(prev => [...prev, data]);
+          setMessages((prev) => [...prev, data]);
         } catch (err) {
-          console.error('Failed to parse WebSocket message:', err);
+          console.error("Failed to parse WebSocket message:", err);
         }
       };
 
       ws.current.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        console.log("WebSocket disconnected:", event.code, event.reason);
         setIsConnected(false);
 
         // Attempt reconnection if not a normal closure
-        if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
+        if (
+          event.code !== 1000 &&
+          reconnectAttempts.current < maxReconnectAttempts
+        ) {
           reconnectAttempts.current++;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+          const delay = Math.min(
+            1000 * Math.pow(2, reconnectAttempts.current),
+            30000
+          );
 
           reconnectTimeout.current = setTimeout(() => {
-            console.log(`Attempting reconnection ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+            console.log(
+              `Attempting reconnection ${reconnectAttempts.current}/${maxReconnectAttempts}`
+            );
             connect();
           }, delay);
         }
       };
 
       ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setError('Connection failed');
+        console.error("WebSocket error:", error);
+        setError("Connection failed");
       };
-
     } catch (err) {
-      setError('Failed to create WebSocket connection');
+      setError("Failed to create WebSocket connection");
     }
   }, [url, token]);
 
@@ -1461,7 +1468,7 @@ export const useWebSocket = (url, token = null) => {
       clearTimeout(reconnectTimeout.current);
     }
     if (ws.current) {
-      ws.current.close(1000, 'Component unmounting');
+      ws.current.close(1000, "Component unmounting");
     }
   }, []);
 
@@ -1469,7 +1476,7 @@ export const useWebSocket = (url, token = null) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message));
     } else {
-      console.warn('WebSocket is not connected');
+      console.warn("WebSocket is not connected");
     }
   }, []);
 
@@ -1487,7 +1494,7 @@ export const useWebSocket = (url, token = null) => {
     error,
     sendMessage,
     reconnect: connect,
-    disconnect
+    disconnect,
   };
 };
 ```
@@ -1498,52 +1505,52 @@ Create a chat component using the WebSocket hook:
 
 ```jsx
 // src/components/Chat.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect, useRef } from "react";
+import { useWebSocket } from "../hooks/useWebSocket";
+import { useAuth } from "../contexts/AuthContext";
 
 const Chat = () => {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
   const messagesEndRef = useRef(null);
   const { user } = useAuth();
 
   // Connect to WebSocket server
   const { isConnected, messages, sendMessage, error } = useWebSocket(
-    'ws://localhost:3000', // Your WebSocket server URL
-    localStorage.getItem('token') // Pass auth token
+    "ws://localhost:3000", // Your WebSocket server URL
+    localStorage.getItem("token") // Pass auth token
   );
 
   // Update chat messages when new messages arrive
   useEffect(() => {
-    setChatMessages(prev => [...prev, ...messages]);
+    setChatMessages((prev) => [...prev, ...messages]);
   }, [messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (message.trim() && isConnected) {
       const messageData = {
-        type: 'chat',
+        type: "chat",
         content: message,
         sender: user.name,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       sendMessage(messageData);
-      setMessage('');
+      setMessage("");
     }
   };
 
   const handleTyping = () => {
     if (isConnected) {
       sendMessage({
-        type: 'typing',
-        sender: user.name
+        type: "typing",
+        sender: user.name,
       });
     }
   };
@@ -1552,8 +1559,12 @@ const Chat = () => {
     <div className="chat-container">
       <div className="chat-header">
         <h3>Chat Room</h3>
-        <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-          {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+        <div
+          className={`connection-status ${
+            isConnected ? "connected" : "disconnected"
+          }`}
+        >
+          {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
         </div>
       </div>
 
@@ -1563,7 +1574,9 @@ const Chat = () => {
         {chatMessages.map((msg, index) => (
           <div
             key={index}
-            className={`message ${msg.sender === user.name ? 'own-message' : 'other-message'}`}
+            className={`message ${
+              msg.sender === user.name ? "own-message" : "other-message"
+            }`}
           >
             <div className="message-header">
               <span className="sender">{msg.sender}</span>
@@ -1603,37 +1616,39 @@ Create a notification system that listens for server-sent notifications:
 
 ```jsx
 // src/components/NotificationCenter.jsx
-import React, { useEffect, useState } from 'react';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useEffect, useState } from "react";
+import { useWebSocket } from "../hooks/useWebSocket";
+import { useAuth } from "../contexts/AuthContext";
 
 const NotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
   const { user } = useAuth();
 
   const { messages, sendMessage } = useWebSocket(
-    'ws://localhost:3000',
-    localStorage.getItem('token')
+    "ws://localhost:3000",
+    localStorage.getItem("token")
   );
 
   useEffect(() => {
     // Filter notification messages
-    const notificationMessages = messages.filter(msg => msg.type === 'notification');
-    setNotifications(prev => [...prev, ...notificationMessages]);
+    const notificationMessages = messages.filter(
+      (msg) => msg.type === "notification"
+    );
+    setNotifications((prev) => [...prev, ...notificationMessages]);
   }, [messages]);
 
   // Join user's notification room
   useEffect(() => {
     if (user) {
       sendMessage({
-        type: 'join',
-        room: `user_${user.id}`
+        type: "join",
+        room: `user_${user.id}`,
       });
     }
   }, [user, sendMessage]);
 
   const dismissNotification = (id) => {
-    setNotifications(prev => prev.filter(notif => notif.id !== id));
+    setNotifications((prev) => prev.filter((notif) => notif.id !== id));
   };
 
   return (
@@ -1665,14 +1680,14 @@ Create components that automatically update when data changes on the server:
 
 ```jsx
 // src/components/LivePosts.jsx
-import React, { useState, useEffect } from 'react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import React, { useState, useEffect } from "react";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 const LivePosts = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const { messages, sendMessage } = useWebSocket('ws://localhost:3000');
+  const { messages, sendMessage } = useWebSocket("ws://localhost:3000");
 
   // Fetch initial posts
   useEffect(() => {
@@ -1681,31 +1696,33 @@ const LivePosts = () => {
 
   // Join posts room for live updates
   useEffect(() => {
-    sendMessage({ type: 'join', room: 'posts' });
+    sendMessage({ type: "join", room: "posts" });
   }, [sendMessage]);
 
   // Handle real-time updates
   useEffect(() => {
-    messages.forEach(message => {
-      if (message.type === 'postCreated') {
-        setPosts(prev => [message.post, ...prev]);
-      } else if (message.type === 'postUpdated') {
-        setPosts(prev => prev.map(post =>
-          post.id === message.post.id ? message.post : post
-        ));
-      } else if (message.type === 'postDeleted') {
-        setPosts(prev => prev.filter(post => post.id !== message.postId));
+    messages.forEach((message) => {
+      if (message.type === "postCreated") {
+        setPosts((prev) => [message.post, ...prev]);
+      } else if (message.type === "postUpdated") {
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === message.post.id ? message.post : post
+          )
+        );
+      } else if (message.type === "postDeleted") {
+        setPosts((prev) => prev.filter((post) => post.id !== message.postId));
       }
     });
   }, [messages]);
 
   const fetchPosts = async () => {
     try {
-      const response = await fetch('/api/posts');
+      const response = await fetch("/api/posts");
       const data = await response.json();
       setPosts(data);
     } catch (error) {
-      console.error('Failed to fetch posts:', error);
+      console.error("Failed to fetch posts:", error);
     } finally {
       setLoading(false);
     }
@@ -1716,11 +1733,13 @@ const LivePosts = () => {
   return (
     <div className="live-posts">
       <h2>Live Posts Feed</h2>
-      {posts.map(post => (
+      {posts.map((post) => (
         <div key={post.id} className="post">
           <h3>{post.title}</h3>
           <p>{post.content}</p>
-          <small>By {post.author.name} • {new Date(post.createdAt).toLocaleString()}</small>
+          <small>
+            By {post.author.name} • {new Date(post.createdAt).toLocaleString()}
+          </small>
         </div>
       ))}
     </div>
@@ -1736,8 +1755,8 @@ Create a context to manage WebSocket connections globally:
 
 ```jsx
 // src/contexts/WebSocketContext.jsx
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import React, { createContext, useContext, useState, useCallback } from "react";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 const WebSocketContext = createContext();
 
@@ -1745,19 +1764,22 @@ export const useWebSocketContext = () => useContext(WebSocketContext);
 
 export const WebSocketProvider = ({ children }) => {
   const [currentRoom, setCurrentRoom] = useState(null);
-  const ws = useWebSocket('ws://localhost:3000', localStorage.getItem('token'));
+  const ws = useWebSocket("ws://localhost:3000", localStorage.getItem("token"));
 
-  const joinRoom = useCallback((roomName) => {
-    if (currentRoom) {
-      ws.sendMessage({ type: 'leave', room: currentRoom });
-    }
-    ws.sendMessage({ type: 'join', room: roomName });
-    setCurrentRoom(roomName);
-  }, [currentRoom, ws]);
+  const joinRoom = useCallback(
+    (roomName) => {
+      if (currentRoom) {
+        ws.sendMessage({ type: "leave", room: currentRoom });
+      }
+      ws.sendMessage({ type: "join", room: roomName });
+      setCurrentRoom(roomName);
+    },
+    [currentRoom, ws]
+  );
 
   const leaveRoom = useCallback(() => {
     if (currentRoom) {
-      ws.sendMessage({ type: 'leave', room: currentRoom });
+      ws.sendMessage({ type: "leave", room: currentRoom });
       setCurrentRoom(null);
     }
   }, [currentRoom, ws]);
@@ -1766,7 +1788,7 @@ export const WebSocketProvider = ({ children }) => {
     ...ws,
     currentRoom,
     joinRoom,
-    leaveRoom
+    leaveRoom,
   };
 
   return (
@@ -1783,17 +1805,17 @@ Add typing indicators to your chat:
 
 ```jsx
 // src/hooks/useTyping.js
-import { useState, useEffect, useCallback } from 'react';
-import { useWebSocketContext } from '../contexts/WebSocketContext';
+import { useState, useEffect, useCallback } from "react";
+import { useWebSocketContext } from "../contexts/WebSocketContext";
 
 export const useTyping = (roomId) => {
   const [typingUsers, setTypingUsers] = useState([]);
   const { messages, sendMessage } = useWebSocketContext();
 
   useEffect(() => {
-    messages.forEach(message => {
-      if (message.type === 'userTyping' && message.room === roomId) {
-        setTypingUsers(prev => {
+    messages.forEach((message) => {
+      if (message.type === "userTyping" && message.room === roomId) {
+        setTypingUsers((prev) => {
           if (!prev.includes(message.user)) {
             return [...prev, message.user];
           }
@@ -1802,7 +1824,9 @@ export const useTyping = (roomId) => {
 
         // Remove typing indicator after 3 seconds
         setTimeout(() => {
-          setTypingUsers(prev => prev.filter(user => user !== message.user));
+          setTypingUsers((prev) =>
+            prev.filter((user) => user !== message.user)
+          );
         }, 3000);
       }
     });
@@ -1810,24 +1834,24 @@ export const useTyping = (roomId) => {
 
   const startTyping = useCallback(() => {
     sendMessage({
-      type: 'typing',
+      type: "typing",
       room: roomId,
-      user: 'current-user-name' // Replace with actual user
+      user: "current-user-name", // Replace with actual user
     });
   }, [sendMessage, roomId]);
 
   const stopTyping = useCallback(() => {
     sendMessage({
-      type: 'stopTyping',
+      type: "stopTyping",
       room: roomId,
-      user: 'current-user-name'
+      user: "current-user-name",
     });
   }, [sendMessage, roomId]);
 
   return {
     typingUsers,
     startTyping,
-    stopTyping
+    stopTyping,
   };
 };
 ```
@@ -1838,16 +1862,20 @@ Enhanced error handling for WebSocket connections:
 
 ```jsx
 // src/components/WebSocketStatus.jsx
-import React from 'react';
-import { useWebSocketContext } from '../contexts/WebSocketContext';
+import React from "react";
+import { useWebSocketContext } from "../contexts/WebSocketContext";
 
 const WebSocketStatus = () => {
   const { isConnected, error, reconnect } = useWebSocketContext();
 
   return (
     <div className="websocket-status">
-      <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-        {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+      <div
+        className={`status-indicator ${
+          isConnected ? "connected" : "disconnected"
+        }`}
+      >
+        {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
       </div>
 
       {error && (
@@ -1860,9 +1888,7 @@ const WebSocketStatus = () => {
       )}
 
       {!isConnected && !error && (
-        <div className="connecting-message">
-          Connecting to server...
-        </div>
+        <div className="connecting-message">Connecting to server...</div>
       )}
     </div>
   );
@@ -1875,10 +1901,10 @@ export default WebSocketStatus;
 
 ```jsx
 // src/components/Chat.test.jsx
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { WebSocketProvider } from '../contexts/WebSocketContext';
-import Chat from './Chat';
+import React from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { WebSocketProvider } from "../contexts/WebSocketContext";
+import Chat from "./Chat";
 
 // Mock WebSocket
 global.WebSocket = jest.fn().mockImplementation(() => ({
@@ -1888,7 +1914,7 @@ global.WebSocket = jest.fn().mockImplementation(() => ({
   onmessage: jest.fn(),
   onclose: jest.fn(),
   onerror: jest.fn(),
-  readyState: 1 // OPEN
+  readyState: 1, // OPEN
 }));
 
 const renderChat = () => {
@@ -1899,20 +1925,22 @@ const renderChat = () => {
   );
 };
 
-describe('Chat Component', () => {
-  it('renders chat interface', () => {
+describe("Chat Component", () => {
+  it("renders chat interface", () => {
     renderChat();
-    expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Type a message...")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
   });
 
-  it('sends message when form is submitted', async () => {
+  it("sends message when form is submitted", async () => {
     renderChat();
 
-    const input = screen.getByPlaceholderText('Type a message...');
-    const sendButton = screen.getByRole('button', { name: 'Send' });
+    const input = screen.getByPlaceholderText("Type a message...");
+    const sendButton = screen.getByRole("button", { name: "Send" });
 
-    fireEvent.change(input, { target: { value: 'Hello World!' } });
+    fireEvent.change(input, { target: { value: "Hello World!" } });
     fireEvent.click(sendButton);
 
     // Verify WebSocket send was called
@@ -1929,9 +1957,10 @@ For your school server deployment, update WebSocket URLs:
 
 ```jsx
 // In production, use your school server
-const WS_URL = process.env.NODE_ENV === 'production'
-  ? 'ws://192.41.1.117:3000'  // Your school server WebSocket URL
-  : 'ws://localhost:3000';    // Development
+const WS_URL =
+  process.env.NODE_ENV === "production"
+    ? "ws://192.41.1.117:3000" // Your school server WebSocket URL
+    : "ws://localhost:3000"; // Development
 
 // Use in your WebSocket hook
 export const useWebSocket = (token = null) => {
@@ -1944,18 +1973,21 @@ export const useWebSocket = (token = null) => {
 ### 10. WebSocket Security Best Practices
 
 1. **Always use WSS in production:**
+
 ```javascript
-const WS_URL = process.env.NODE_ENV === 'production'
-  ? 'wss://yourdomain.com'  // Secure WebSocket
-  : 'ws://localhost:3000';
+const WS_URL =
+  process.env.NODE_ENV === "production"
+    ? "wss://yourdomain.com" // Secure WebSocket
+    : "ws://localhost:3000";
 ```
 
 2. **Validate messages on both client and server:**
+
 ```javascript
 // Client-side validation
 const validateMessage = (message) => {
-  if (!message.type || typeof message.type !== 'string') {
-    throw new Error('Invalid message format');
+  if (!message.type || typeof message.type !== "string") {
+    throw new Error("Invalid message format");
   }
   // Add more validation as needed
 };
