@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.IO Test Page</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #messages {
+        border: 1px solid #ccc;
+        height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        margin: 10px 0;
+        background: #f9f9f9;
+      }
+      input,
+      button {
+        padding: 8px;
+        margin: 5px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .connected {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+    </style>
+    <!-- Socket.IO Client Library -->
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <h1>Socket.IO Testing Page</h1>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div>
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <input
+        type="text"
+        id="roomInput"
+        placeholder="Room name"
+        value="test-room"
+      />
+      <button onclick="sendMessage()">Send Message</button>
+      <button onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <div>
+      <button onclick="startTyping()">Start Typing</button>
+      <button onclick="stopTyping()">Stop Typing</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+      let authToken = null;
+      const messagesDiv = document.getElementById("messages");
+      const statusDiv = document.getElementById("status");
+
+      // First, get authentication token
+      async function authenticate() {
+        try {
+          addMessage("Authenticating...");
+          console.log("Starting authentication...");
+
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "socket@example.com",
+              password: "test123",
+            }),
+          });
+
+          console.log("Auth response status:", response.status);
+          const data = await response.json();
+          console.log("Auth response data:", data);
+
+          if (data.token) {
+            authToken = data.token;
+            addMessage("Authentication successful!", "success");
+            console.log("Token received, connecting to Socket.IO...");
+            connectSocketIO();
+          } else {
+            addMessage(
+              "Authentication failed: " + (data.error || "Unknown error"),
+              "error"
+            );
+            console.error("Authentication failed:", data);
+          }
+        } catch (error) {
+          addMessage("Authentication error: " + error.message, "error");
+          console.error("Authentication error:", error);
+        }
+      }
+
+      // Connect to Socket.IO with authentication
+      function connectSocketIO() {
+        console.log(
+          "Connecting to Socket.IO with token:",
+          authToken ? "present" : "missing"
+        );
+
+        const socket = io({
+          auth: {
+            token: authToken,
+          },
+        });
+
+        // Store socket reference for use in functions
+        window.testSocket = socket;
+
+        // Connection events
+        socket.on("connect", () => {
+          statusDiv.textContent = "Connected to Socket.IO server!";
+          statusDiv.className = "status connected";
+          addMessage("Connected to server!", "success");
+          console.log("Socket.IO connected:", socket.id);
+        });
+
+        socket.on("disconnect", () => {
+          statusDiv.textContent = "Disconnected";
+          statusDiv.className = "status disconnected";
+          addMessage("Disconnected from server", "error");
+          console.log("Socket.IO disconnected");
+        });
+
+        socket.on("connect_error", (error) => {
+          statusDiv.textContent = "Connection Error";
+          statusDiv.className = "status disconnected";
+          addMessage("Connection error: " + error.message, "error");
+          console.error("Socket.IO connection error:", error);
+        });
+
+        // Message events
+        socket.on("message", (data) => {
+          addMessage(`Message from ${data.sender}: ${data.message}`);
+        });
+
+        // Typing events
+        socket.on("userTyping", (data) => {
+          addMessage(`${data.user} is typing...`);
+        });
+      }
+
+      function addMessage(message, type = "info") {
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+        div.style.color =
+          type === "error" ? "red" : type === "success" ? "green" : "black";
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // Functions
+      function sendMessage() {
+        if (!window.testSocket) {
+          addMessage("Not connected to Socket.IO", "error");
+          return;
+        }
+
+        const message = document.getElementById("messageInput").value;
+        const room = document.getElementById("roomInput").value;
+
+        if (message.trim()) {
+          window.testSocket.emit("sendMessage", {
+            message: message,
+            room: room,
+            sender: "BrowserUser",
+          });
+          addMessage(`Sent: ${message}`);
+          document.getElementById("messageInput").value = "";
+        }
+      }
+
+      function joinRoom() {
+        if (!window.testSocket) {
+          addMessage("Not connected to Socket.IO", "error");
+          return;
+        }
+
+        const room = document.getElementById("roomInput").value;
+        window.testSocket.emit("join", room);
+        addMessage(`Joined room: ${room}`, "success");
+      }
+
+      function startTyping() {
+        if (!window.testSocket) {
+          addMessage("Not connected to Socket.IO", "error");
+          return;
+        }
+
+        const room = document.getElementById("roomInput").value;
+        window.testSocket.emit("typing", { user: "BrowserUser", room: room });
+        addMessage("Started typing...");
+      }
+
+      function stopTyping() {
+        if (!window.testSocket) {
+          addMessage("Not connected to Socket.IO", "error");
+          return;
+        }
+
+        const room = document.getElementById("roomInput").value;
+        window.testSocket.emit("stopTyping", {
+          user: "BrowserUser",
+          room: room,
+        });
+        addMessage("Stopped typing");
+      }
+
+      // Allow sending messages with Enter key
+      document
+        .getElementById("messageInput")
+        .addEventListener("keypress", (e) => {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        });
+
+      // Start authentication when page loads
+      addMessage("Socket.IO test page loaded. Starting authentication...");
+      authenticate();
+    </script>
+  </body>
+</html>

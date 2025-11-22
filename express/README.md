@@ -358,7 +358,7 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "dev"]
 ```
 
 ### docker-compose.yml (with MongoDB)
@@ -374,6 +374,9 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/expressdb
       - JWT_SECRET=your-secret-key
+    volumes:
+      - .:/app
+      - /app/node_modules
     depends_on:
       - mongodb
 
@@ -388,8 +391,14 @@ services:
 ### Run with Docker
 
 ```bash
-docker-compose up -d
+# Initial build
+docker-compose up --build
+
+# For development (after initial build), just run:
+docker-compose up
 ```
+
+**Note:** The volume mounting allows code changes to be reflected immediately without rebuilding. The Dockerfile uses `npm run dev` (nodemon) for live reloading during development. Only rebuild when you change dependencies in `package.json`.
 
 ## Testing Your API
 
@@ -453,6 +462,8 @@ simple-express-app/
 
 ### Input Validation with express-validator
 
+**⚠️ Important:** You must install express-validator before using this validation code.
+
 **Install express-validator:**
 
 ```bash
@@ -487,6 +498,155 @@ router.post(
   }
 );
 ```
+
+### Testing Input Validation Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing express-validator:**
+
+**1. Test validation with invalid data:**
+
+```bash
+# Test short name
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"A","email":"test@example.com","password":"password123"}'
+
+# Test invalid email
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"invalid-email","password":"password123"}'
+
+# Test short password
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com","password":"123"}'
+```
+
+**2. Test validation with Node.js script:**
+
+```javascript
+// test-validation.js
+async function testInputValidation() {
+  try {
+    console.log("Testing input validation...\n");
+
+    const testCases = [
+      {
+        name: "Short name",
+        data: {
+          name: "A",
+          email: "test1@example.com",
+          password: "password123",
+        },
+        expectError: true,
+      },
+      {
+        name: "Invalid email",
+        data: {
+          name: "Test User",
+          email: "not-an-email",
+          password: "password123",
+        },
+        expectError: true,
+      },
+      {
+        name: "Short password",
+        data: {
+          name: "Test User",
+          email: "test2@example.com",
+          password: "123",
+        },
+        expectError: true,
+      },
+      {
+        name: "Valid data",
+        data: {
+          name: "Valid User",
+          email: "valid@example.com",
+          password: "validpassword123",
+        },
+        expectError: false,
+      },
+    ];
+
+    for (const testCase of testCases) {
+      console.log(`Testing: ${testCase.name}`);
+
+      const response = await fetch("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testCase.data),
+      });
+
+      const data = await response.json();
+
+      if (testCase.expectError) {
+        if (response.status === 400 && data.errors) {
+          console.log(
+            "✓ Validation error as expected:",
+            data.errors.map((e) => e.msg).join(", ")
+          );
+        } else {
+          console.log(
+            "✗ Expected validation error but got:",
+            response.status,
+            data
+          );
+        }
+      } else {
+        if (response.status === 201 && data.token) {
+          console.log("✓ Registration successful as expected");
+        } else {
+          console.log(
+            "✗ Expected successful registration but got:",
+            response.status,
+            data
+          );
+        }
+      }
+      console.log();
+    }
+  } catch (error) {
+    console.error("Validation test failed:", error);
+  }
+}
+
+testInputValidation();
+```
+
+**3. Test multiple validation errors:**
+
+```bash
+# Send request with multiple invalid fields
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"","email":"invalid","password":"12"}'
+```
+
+**4. Test custom validation messages:**
+
+```javascript
+// Test with browser console
+fetch("/api/auth/register", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "X", // Too short
+    email: "bad-email", // Invalid format
+    password: "pass", // Too short
+  }),
+})
+  .then((res) => res.json())
+  .then((data) => console.log("Validation errors:", data.errors));
+```
+
+**Expected Output:**
+
+- Short name: `400` with "Name must be at least 2 characters"
+- Invalid email: `400` with "Invalid email"
+- Short password: `400` with "Password must be at least 6 characters"
+- Valid data: `201` with token and user object
+- Multiple errors: Array of all validation error messages
 
 ### Error Handling Middleware
 
@@ -533,6 +693,122 @@ module.exports = errorHandler;
 const errorHandler = require("./middleware/error");
 app.use(errorHandler);
 ```
+
+### Testing Error Handling Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing error handling:**
+
+**1. Test invalid MongoDB ObjectId:**
+
+```bash
+# Try to get a post with invalid ID
+curl http://localhost:3000/api/posts/invalid-id-123
+```
+
+**2. Test duplicate key error:**
+
+```bash
+# Register user
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"duplicate@example.com","password":"password123"}'
+
+# Try to register again with same email
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User 2","email":"duplicate@example.com","password":"password123"}'
+```
+
+**3. Test validation errors with Node.js:**
+
+```javascript
+// test-errors.js
+async function testErrorHandling() {
+  try {
+    console.log("Testing various error scenarios...\n");
+
+    // Test 1: Invalid ObjectId
+    console.log("1. Testing invalid ObjectId:");
+    const invalidIdResponse = await fetch(
+      "http://localhost:3000/api/posts/invalid-object-id"
+    );
+    const invalidIdData = await invalidIdResponse.json();
+    console.log("Status:", invalidIdResponse.status);
+    console.log("Response:", invalidIdData);
+    console.log();
+
+    // Test 2: Duplicate email registration
+    console.log("2. Testing duplicate email:");
+    // First registration
+    await fetch("http://localhost:3000/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Error Test User",
+        email: "error-test@example.com",
+        password: "password123",
+      }),
+    });
+
+    // Second registration with same email
+    const duplicateResponse = await fetch(
+      "http://localhost:3000/api/auth/register",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Error Test User 2",
+          email: "error-test@example.com",
+          password: "password123",
+        }),
+      }
+    );
+    const duplicateData = await duplicateResponse.json();
+    console.log("Status:", duplicateResponse.status);
+    console.log("Response:", duplicateData);
+    console.log();
+
+    // Test 3: Invalid route (should return 404)
+    console.log("3. Testing invalid route:");
+    const notFoundResponse = await fetch(
+      "http://localhost:3000/api/nonexistent-route"
+    );
+    console.log("Status:", notFoundResponse.status);
+    try {
+      const notFoundData = await notFoundResponse.json();
+      console.log("Response:", notFoundData);
+    } catch (e) {
+      console.log("Response: (not JSON)");
+    }
+  } catch (error) {
+    console.error("Error handling test failed:", error);
+  }
+}
+
+testErrorHandling();
+```
+
+**4. Test server errors:**
+
+```bash
+# Test with malformed JSON
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"invalid": json}'
+
+# Test with missing required fields (if validation is implemented)
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test"}'
+```
+
+**Expected Output:**
+
+- Invalid ObjectId: `404` with "Resource not found"
+- Duplicate key: `400` with "Duplicate field value entered"
+- Invalid route: `404` (Express default) or custom error
+- Malformed JSON: `400` or `500` depending on middleware
+- Validation errors: `400` with validation messages
 
 ### Password Reset Functionality
 
@@ -601,6 +877,139 @@ router.put("/resetpassword/:resettoken", async (req, res) => {
   res.json({ message: "Password reset successful" });
 });
 ```
+
+### Testing Password Reset Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing password reset:**
+
+**1. Test forgot password flow:**
+
+```bash
+# Register a test user
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Reset Test","email":"reset@example.com","password":"oldpassword"}'
+
+# Request password reset
+RESET_RESPONSE=$(curl -X POST http://localhost:3000/api/auth/forgotpassword \
+  -H "Content-Type: application/json" \
+  -d '{"email":"reset@example.com"}')
+
+echo "Reset response: $RESET_RESPONSE"
+
+# Extract reset token (in real app, this would come via email)
+RESET_TOKEN=$(echo $RESET_RESPONSE | jq -r '.resetToken')
+echo "Reset token: $RESET_TOKEN"
+```
+
+**2. Test password reset with Node.js:**
+
+```javascript
+// test-password-reset.js
+async function testPasswordReset() {
+  try {
+    // Register user
+    await fetch("http://localhost:3000/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Password Reset Test",
+        email: "reset-test@example.com",
+        password: "oldpassword123",
+      }),
+    });
+
+    // Request password reset
+    const forgotResponse = await fetch(
+      "http://localhost:3000/api/auth/forgotpassword",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "reset-test@example.com",
+        }),
+      }
+    );
+
+    const forgotData = await forgotResponse.json();
+    console.log("Forgot password response:", forgotData);
+
+    if (forgotData.resetToken) {
+      // Reset password
+      const resetResponse = await fetch(
+        `http://localhost:3000/api/auth/resetpassword/${forgotData.resetToken}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            password: "newpassword123",
+          }),
+        }
+      );
+
+      const resetData = await resetResponse.json();
+      console.log("Password reset response:", resetData);
+
+      // Test login with new password
+      const loginResponse = await fetch(
+        "http://localhost:3000/api/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "reset-test@example.com",
+            password: "newpassword123",
+          }),
+        }
+      );
+
+      const loginData = await loginResponse.json();
+      console.log(
+        "Login with new password:",
+        loginData.token ? "Success" : "Failed"
+      );
+    }
+  } catch (error) {
+    console.error("Password reset test failed:", error);
+  }
+}
+
+testPasswordReset();
+```
+
+**3. Test invalid reset token:**
+
+```bash
+# Try to reset with invalid token
+curl -X PUT http://localhost:3000/api/auth/resetpassword/invalid-token \
+  -H "Content-Type: application/json" \
+  -d '{"password":"newpassword"}'
+```
+
+**4. Test expired token (wait 10+ minutes after requesting reset):**
+
+```bash
+# This should fail after token expires
+curl -X PUT http://localhost:3000/api/auth/resetpassword/$RESET_TOKEN \
+  -H "Content-Type: application/json" \
+  -d '{"password":"newpassword"}'
+```
+
+**5. Test non-existent email:**
+
+```bash
+curl -X POST http://localhost:3000/api/auth/forgotpassword \
+  -H "Content-Type: application/json" \
+  -d '{"email":"nonexistent@example.com"}'
+```
+
+**Expected Output:**
+
+- Forgot password: `{"message": "Email sent", "resetToken": "..."}`
+- Valid reset: `{"message": "Password reset successful"}`
+- Invalid token: `{"error": "Invalid token"}`
+- Non-existent email: `{"error": "User not found"}`
+- Login with new password: Should return valid JWT token
 
 ### File Upload with Multer
 
@@ -673,6 +1082,114 @@ router.post("/upload", upload.single("avatar"), async (req, res) => {
 });
 ```
 
+### Testing File Upload Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing file upload:**
+
+**1. Create test image file:**
+
+```bash
+# Create a simple test image (1x1 pixel PNG)
+echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" | base64 -d > test-image.png
+```
+
+**2. Test file upload with curl:**
+
+```bash
+# First register and login to get token
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com","password":"password123"}'
+
+# Login to get token
+TOKEN=$(curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}' \
+  | jq -r '.token')
+
+# Upload file
+curl -X POST http://localhost:3000/api/users/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "avatar=@test-image.png" \
+  -H "Content-Type: multipart/form-data"
+```
+
+**3. Test file upload with Node.js script:**
+
+```javascript
+// Create test-upload.js
+const fs = require("fs");
+const path = require("path");
+
+// First get authentication token
+async function testFileUpload() {
+  try {
+    // Register user
+    const registerResponse = await fetch(
+      "http://localhost:3000/api/auth/register",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Upload Test User",
+          email: "upload@example.com",
+          password: "password123",
+        }),
+      }
+    );
+    const registerData = await registerResponse.json();
+    const token = registerData.token;
+
+    // Create a simple test file
+    const testFilePath = path.join(__dirname, "test-upload.txt");
+    fs.writeFileSync(testFilePath, "This is a test file for upload");
+
+    // Upload file
+    const formData = new FormData();
+    formData.append("avatar", fs.createReadStream(testFilePath));
+
+    const uploadResponse = await fetch(
+      "http://localhost:3000/api/users/upload",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    const result = await uploadResponse.json();
+    console.log("Upload result:", result);
+
+    // Cleanup
+    fs.unlinkSync(testFilePath);
+  } catch (error) {
+    console.error("Upload test failed:", error);
+  }
+}
+
+testFileUpload();
+```
+
+**4. Test invalid file type:**
+
+```bash
+# Create a text file
+echo "This is not an image" > not-an-image.txt
+
+# Try to upload (should fail)
+curl -X POST http://localhost:3000/api/users/upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "avatar=@not-an-image.txt"
+```
+
+**Expected Output:**
+
+- Success: `{"user": {"_id": "...", "avatar": "uploads/avatar-123456789.png"}}`
+- Invalid file: `{"error": "Error: Images Only!"}`
+- No file: `{"error": "Please upload a file"}`
+
 ### Admin Routes and Middleware
 
 **middleware/admin.js:**
@@ -737,6 +1254,126 @@ module.exports = router;
 const adminRoutes = require("./routes/admin");
 app.use("/api/admin", adminRoutes);
 ```
+
+### Testing Admin Routes Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing admin routes:**
+
+**1. Create admin and regular users:**
+
+```bash
+# Create admin user (manually set role in database or add role field to registration)
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Admin User","email":"admin@example.com","password":"admin123"}'
+
+# Create regular user
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Regular User","email":"user@example.com","password":"user123"}'
+```
+
+**2. Test admin access (assuming you have admin role logic):**
+
+```javascript
+// test-admin.js - Node.js script for admin testing
+async function testAdminRoutes() {
+  try {
+    // Login as admin
+    const adminLogin = await fetch("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "admin@example.com",
+        password: "admin123",
+      }),
+    });
+    const adminData = await adminLogin.json();
+    const adminToken = adminData.token;
+
+    // Login as regular user
+    const userLogin = await fetch("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "user@example.com",
+        password: "user123",
+      }),
+    });
+    const userData = await userLogin.json();
+    const userToken = userData.token;
+
+    console.log("Admin token:", adminToken ? "Received" : "Failed");
+    console.log("User token:", userToken ? "Received" : "Failed");
+
+    // Test admin routes with admin token
+    const adminUsers = await fetch("http://localhost:3000/api/admin/users", {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log("Admin get users:", adminUsers.status);
+
+    // Test admin routes with regular user token (should fail)
+    const userAdminAccess = await fetch(
+      "http://localhost:3000/api/admin/users",
+      {
+        headers: { Authorization: `Bearer ${userToken}` },
+      }
+    );
+    console.log("User admin access (should fail):", userAdminAccess.status);
+  } catch (error) {
+    console.error("Admin test failed:", error);
+  }
+}
+
+testAdminRoutes();
+```
+
+**3. Test admin operations with curl:**
+
+```bash
+# Login as admin
+ADMIN_TOKEN=$(curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"admin123"}' \
+  | jq -r '.token')
+
+# Get all users (admin only)
+curl -X GET http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# Try with regular user token (should fail)
+USER_TOKEN=$(curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"user123"}' \
+  | jq -r '.token')
+
+curl -X GET http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer $USER_TOKEN"
+```
+
+**4. Test user management:**
+
+```bash
+# Get user ID from previous response
+USER_ID="REPLACE_WITH_ACTUAL_USER_ID"
+
+# Update user role
+curl -X PUT http://localhost:3000/api/admin/users/$USER_ID/role \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"moderator"}'
+
+# Delete user
+curl -X DELETE http://localhost:3000/api/admin/users/$USER_ID \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+**Expected Output:**
+
+- Admin access: `200 OK` with user list
+- Regular user access: `403 Forbidden` with "Access denied. Admin role required."
+- Role update: `200 OK` with updated user object
+- Delete user: `200 OK` with "User deleted"
 
 ### Testing with Jest and Supertest
 
@@ -838,6 +1475,13 @@ Happy coding! 🚀
 
 ## WebSocket Integration with Socket.IO
 
+**⚠️ CRITICAL FIXES INCLUDED:**
+
+- Static file serving middleware (`app.use(express.static('public'))`)
+- Server startup with `server.listen()` instead of `app.listen()`
+- Volume mounting in docker-compose.yml for file access
+- Complete test HTML file with authentication
+
 Real-time communication is essential for modern web applications. Socket.IO provides WebSocket functionality with fallbacks for older browsers.
 
 ### 1. Install Socket.IO
@@ -846,7 +1490,17 @@ Real-time communication is essential for modern web applications. Socket.IO prov
 npm install socket.io
 ```
 
+**For Redis scaling (optional):**
+
+```bash
+npm install socket.io-redis redis
+```
+
 ### 2. Update app.js for Socket.IO
+
+**⚠️ Important:** Start with basic Socket.IO first, then add Redis later if needed for scaling.
+
+**Basic Socket.IO setup (without Redis - recommended for development):**
 
 ```javascript
 const express = require("express");
@@ -860,14 +1514,21 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:4200", // Your frontend URL
+    origin: "*", // Allow all origins for testing
     methods: ["GET", "POST"],
   },
 });
 
+// Socket.IO authentication middleware
+const socketAuth = require("./middleware/socketAuth");
+io.use(socketAuth);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// CRITICAL: Serve static files so test HTML page works
+app.use(express.static("public"));
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -1069,31 +1730,28 @@ io.use(socketAuth);
 
 ### 5. Socket.IO with Redis (for scaling)
 
+**⚠️ Redis is optional and only needed for scaling across multiple server instances. Skip this for basic development.**
+
 For production scaling across multiple server instances:
 
 ```bash
 npm install socket.io-redis redis
 ```
 
-**Update app.js:**
+**Update app.js for Redis (only if you need scaling):**
 
 ```javascript
 const redisAdapter = require("socket.io-redis");
 
-// ... existing code ...
+// ... existing Socket.IO setup ...
 
-// Redis adapter for scaling
-io.adapter(
-  redisAdapter({
-    host: "localhost",
-    port: 6379,
-  })
-);
-
-// ... rest of code ...
+// Redis adapter for scaling (only add this if you have Redis running)
+io.adapter(redisAdapter({ host: "redis", port: 6379 })); // Use "redis" for Docker service name
 ```
 
-### 6. Docker Compose with Redis
+### 6. Docker Compose with Redis (Optional - only for scaling)
+
+**Skip this section if you're not using Redis for scaling.**
 
 ```yaml
 version: "3.8"
@@ -1124,7 +1782,7 @@ services:
       - "6379:6379"
 ```
 
-### 7. Testing Socket.IO
+### 7. Testing Socket.IO (Unit Tests)
 
 **tests/socket.test.js**:
 
@@ -1171,7 +1829,192 @@ describe("Socket.IO Tests", () => {
 });
 ```
 
-### 8. Socket.IO Events Reference
+### 8. Testing Socket.IO Immediately
+
+**⚠️ Quick Test Commands - Try these right after implementing Socket.IO:**
+
+**1. Create test directory and HTML file:**
+
+```bash
+# Create public directory for static files
+mkdir -p public
+
+# Create test HTML file
+cat > public/socket-test.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin: 10px 0; background: #f9f9f9; }
+        input, button { padding: 8px; margin: 5px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .disconnected { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Testing Page</h1>
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div>
+        <input type="text" id="messageInput" placeholder="Type a message..." />
+        <input type="text" id="roomInput" placeholder="Room name" value="test-room" />
+        <button onclick="sendMessage()">Send Message</button>
+        <button onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <div>
+        <button onclick="startTyping()">Start Typing</button>
+        <button onclick="stopTyping()">Stop Typing</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+        let authToken = null;
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('status');
+
+        async function authenticate() {
+            try {
+                addMessage('Authenticating...');
+                console.log('Starting authentication...');
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'socket@example.com', password: 'test123' })
+                });
+                console.log('Auth response status:', response.status);
+                const data = await response.json();
+                console.log('Auth response data:', data);
+                if (data.token) {
+                    authToken = data.token;
+                    addMessage('Authentication successful!', 'success');
+                    console.log('Token received, connecting to Socket.IO...');
+                    connectSocketIO();
+                } else {
+                    addMessage('Authentication failed: ' + (data.error || 'Unknown error'), 'error');
+                    console.error('Authentication failed:', data);
+                }
+            } catch (error) {
+                addMessage('Authentication error: ' + error.message, 'error');
+                console.error('Authentication error:', error);
+            }
+        }
+
+        function connectSocketIO() {
+            console.log('Connecting to Socket.IO with token:', authToken ? 'present' : 'missing');
+            const socket = io({ auth: { token: authToken } });
+            window.testSocket = socket;
+
+            socket.on('connect', () => {
+                statusDiv.textContent = 'Connected to Socket.IO server!';
+                statusDiv.className = 'status connected';
+                addMessage('Connected to server!', 'success');
+                console.log('Socket.IO connected:', socket.id);
+            });
+
+            socket.on('disconnect', () => {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status disconnected';
+                addMessage('Disconnected from server', 'error');
+                console.log('Socket.IO disconnected');
+            });
+
+            socket.on('connect_error', (error) => {
+                statusDiv.textContent = 'Connection Error';
+                statusDiv.className = 'status disconnected';
+                addMessage('Connection error: ' + error.message, 'error');
+                console.error('Socket.IO connection error:', error);
+            });
+
+            socket.on('message', (data) => {
+                addMessage(`Message from ${data.sender}: ${data.message}`);
+            });
+
+            socket.on('userTyping', (data) => {
+                addMessage(`${data.user} is typing...`);
+            });
+        }
+
+        function addMessage(message, type = 'info') {
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            div.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            if (!window.testSocket) { addMessage('Not connected to Socket.IO', 'error'); return; }
+            const message = document.getElementById('messageInput').value;
+            const room = document.getElementById('roomInput').value;
+            if (message.trim()) {
+                window.testSocket.emit('sendMessage', { message, room, sender: 'BrowserUser' });
+                addMessage(`Sent: ${message}`);
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        function joinRoom() {
+            if (!window.testSocket) { addMessage('Not connected to Socket.IO', 'error'); return; }
+            const room = document.getElementById('roomInput').value;
+            window.testSocket.emit('join', room);
+            addMessage(`Joined room: ${room}`, 'success');
+        }
+
+        function startTyping() {
+            if (!window.testSocket) { addMessage('Not connected to Socket.IO', 'error'); return; }
+            const room = document.getElementById('roomInput').value;
+            window.testSocket.emit('typing', { user: 'BrowserUser', room });
+            addMessage('Started typing...');
+        }
+
+        function stopTyping() {
+            if (!window.testSocket) { addMessage('Not connected to Socket.IO', 'error'); return; }
+            const room = document.getElementById('roomInput').value;
+            window.testSocket.emit('stopTyping', { user: 'BrowserUser', room });
+            addMessage('Stopped typing');
+        }
+
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        addMessage('Socket.IO test page loaded. Starting authentication...');
+        authenticate();
+    </script>
+</body>
+</html>
+EOF
+```
+
+**2. Register a test user for authentication:**
+
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"SocketTest","email":"socket@example.com","password":"test123"}'
+```
+
+**3. Open the test page:**
+
+```
+http://localhost:3000/socket-test.html
+```
+
+**4. Test Socket.IO features:**
+
+- Messages should appear in the green "Connected" status area
+- Send messages and see them appear instantly
+- Open the same URL in another tab for real-time testing
+
+### 9. Socket.IO Events Reference
 
 **Common Events:**
 
@@ -1190,7 +2033,7 @@ describe("Socket.IO Tests", () => {
 - `userOnline` - User came online
 - `userStatusChanged` - User status changed
 
-### 9. Production Considerations
+### 10. Production Considerations
 
 1. **Use environment variables for Socket.IO config:**
 
@@ -1237,4 +2080,25 @@ setInterval(() => {
 }, 30000);
 ```
 
-Your Express app now supports real-time communication! 🎉
+### Socket.IO Troubleshooting
+
+**"Error: connect ECONNREFUSED 127.0.0.1:6379"**
+
+- **Cause:** Trying to use Redis adapter but Redis isn't running
+- **Solution:** Either remove Redis adapter code for basic Socket.IO, or add Redis to docker-compose.yml and use `redis:6379` instead of `localhost:6379`
+
+**"CORS error"**
+
+- **Cause:** Frontend origin not allowed
+- **Solution:** Update the `cors.origin` in Socket.IO config to match your frontend URL
+
+**"Socket.IO connection failed"**
+
+- **Cause:** Wrong server URL or port
+- **Solution:** Make sure client connects to `http://localhost:3000` (same as Express server)
+
+**For basic development (recommended):**
+
+- Remove all Redis-related code
+- Use basic Socket.IO setup
+- Add Redis only when scaling to multiple servers
